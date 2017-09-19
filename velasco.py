@@ -60,6 +60,7 @@ def help(bot, update):
 /help - I send this message.
 /count - I tell you how many messages from this chat I remember.
 /freq - Change the frequency of both my messages and the times I save my learned vocabulary.
+/speak - Forces me to speak.
     """)
 
 def about(bot, update):
@@ -94,8 +95,25 @@ def read(bot, update):
     chatlog.add_msg(update.message.text)
     if chatlog.get_count()%chatlog.freq == 0:
         msg = chatlog.speak()
+        # TO DO: añadir % de que haga reply en vez de send
         bot.sendMessage(chatlog.id, msg)
         savechat(chatlog)
+
+    chatlogs[chatlog.id] = chatlog
+
+def speak(bot, update):
+    global chatlogs
+    ident = str(update.message.chat.id)
+    if not ident in chatlogs:
+        chat = update.message.chat
+        title = get_chatname(chat)
+        chatlog = Chatlog(chat.id, chat.type, title)
+    else:
+        chatlog = chatlogs[ident]
+    chatlog.add_msg(update.message.text)
+    msg = chatlog.speak()
+    update.message.reply_text(msg)
+    savechat(chatlog)
 
     chatlogs[chatlog.id] = chatlog
 
@@ -130,10 +148,12 @@ def set_freq(bot, update):
         try:
             value = update.message.text.split()[1]
             value = int(value)
+            if not value > 0:
+                raise ValueError('Tried to set 0 or negative freq value.')
             chatlogs[ident].set_freq(value)
             reply = "Frequency of speaking set to " + str(value)
         except:
-            reply = "Format was confusing; requency not changed from " + str(chatlogs[ident].freq)
+            reply = "Format was confusing; frequency not changed from " + str(chatlogs[ident].freq)
     update.message.reply_text(reply)
 
 def stop(bot, update):
@@ -162,6 +182,7 @@ def main():
     dp.add_handler(CommandHandler("freq", set_freq))
     dp.add_handler(CommandHandler("list", get_chatlogs))
     dp.add_handler(CommandHandler("stop", stop))
+    dp.add_handler(CommandHandler("speak", speak))
 
     # on noncommand i.e message - echo the message on Telegram
     # dp.add_handler(MessageHandler(Filters.text, echo))
