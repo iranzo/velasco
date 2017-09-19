@@ -59,7 +59,7 @@ def help(bot, update):
 /about - What I'm about.
 /help - I send this message.
 /count - I tell you how many messages from this chat I remember.
-/freq - Change the frequency of both my messages and the times I save my learned vocabulary.
+/freq - Change the frequency of both my messages and the times I save my learned vocabulary. (Maximum of 100000)
 /speak - Forces me to speak.
     """)
 
@@ -85,9 +85,9 @@ def get_chatname(chat):
 
 def read(bot, update):
     global chatlogs
-    ident = str(update.message.chat.id)
+    chat = update.message.chat
+    ident = str(chat.id)
     if not ident in chatlogs:
-        chat = update.message.chat
         title = get_chatname(chat)
         chatlog = Chatlog(chat.id, chat.type, title)
     else:
@@ -96,7 +96,12 @@ def read(bot, update):
     if chatlog.get_count()%chatlog.freq == 0:
         msg = chatlog.speak()
         # TO DO: añadir % de que haga reply en vez de send
-        bot.sendMessage(chatlog.id, msg)
+        try:
+            bot.sendMessage(chatlog.id, msg)
+        except TelegramError:
+            chatlog.set_freq(chatlog.freq + 20)
+        if get_chatname(chat) != chatlog.title:
+            chatlog.set_title(get_chatname(chat))
         savechat(chatlog)
 
     chatlogs[chatlog.id] = chatlog
@@ -110,7 +115,9 @@ def speak(bot, update):
         chatlog = Chatlog(chat.id, chat.type, title)
     else:
         chatlog = chatlogs[ident]
-    chatlog.add_msg(update.message.text)
+    text = update.message.text.split()
+    if len(text) > 1:
+        chatlog.add_msg(' '.join(text[1:]))
     msg = chatlog.speak()
     update.message.reply_text(msg)
     savechat(chatlog)
@@ -148,9 +155,7 @@ def set_freq(bot, update):
         try:
             value = update.message.text.split()[1]
             value = int(value)
-            if not value > 0:
-                raise ValueError('Tried to set 0 or negative freq value.')
-            chatlogs[ident].set_freq(value)
+            value = chatlogs[ident].set_freq(value)
             reply = "Frequency of speaking set to " + str(value)
         except:
             reply = "Format was confusing; frequency not changed from " + str(chatlogs[ident].freq)

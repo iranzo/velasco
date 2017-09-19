@@ -19,6 +19,17 @@ class Chatlog(object):
                 freq = 5
         self.freq = freq
 
+    def set_title(self, title):
+        self.title = title
+
+    def set_freq(self, freq):
+        if not freq > 0:
+            raise ValueError('Tried to set 0 or negative freq value.')
+        elif freq > 100000:
+            freq = 100000
+        self.freq = freq
+        return self.freq
+
     def add_msg(self, message):
         msg = message.split()
         msg.append("!kvl")
@@ -37,9 +48,6 @@ class Chatlog(object):
 
     def get_count(self):
         return len(self.msgs)
-
-    def set_freq(self, freq):
-        self.freq = freq
 
     def to_txt(self):
         lines = [self.id]
