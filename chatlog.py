@@ -3,21 +3,22 @@
 from markov import *
 
 class Chatlog(object):
-    def __init__(self, ident, chattype, title, msgs=None, freq=None):
-        if msgs is not None:
-            self.msgs = msgs
-        else:
-            self.msgs = []
+    def __init__(self, ident, chattype, title, text=None, freq=None):
         self.id = str(ident)
         self.type = chattype
         self.title = title
         if freq is None:
             if "group" in chattype:
-                freq = 20
+                freq = 15
             #elif chattype is "private":
             else:
-                freq = 5
+                freq = 2
         self.freq = freq
+        if text is not None:
+            self.count = len(text)
+        else:
+            self.count = 0
+        self.gen = Markov(text)
 
     def set_title(self, title):
         self.title = title
@@ -31,36 +32,30 @@ class Chatlog(object):
         return self.freq
 
     def add_msg(self, message):
-        msg = message.split()
-        msg.append("!kvl")
-        self.msgs.append(msg)
-
-    def get_markov_gen(self):
-        msgs = []
-        for m in self.msgs:
-            msgs.append(' '.join(m))
-        text = ' '.join(msgs)
-        self.gen = Markov(text)
+        self.gen.add_text(message + " !kvl")
+        self.count += 1
 
     def speak(self):
-        self.get_markov_gen()
         return self.gen.generate_markov_text()
 
     def get_count(self):
-        return len(self.msgs)
+        return self.count
 
     def to_txt(self):
         lines = [self.id]
         lines.append(self.type)
         lines.append(self.title)
         lines.append(str(self.freq))
-        for m in self.msgs:
-            lines.append(' '.join(m))
-        return '\n'.join(lines)
+        lines.append("dict:")
+        txt = '\n'.join(lines)
+        return txt + '\n' + self.gen.to_json()
 
     def from_txt(text):
         lines = text.splitlines()
-        msgs = []
-        for m in lines[4:]:
-            msgs.append(m.split())
-        return Chatlog(lines[0], lines[1], lines[2], msgs, int(lines[3]))
+        if(lines[4] == "dict:"):
+            new_log = Chatlog(lines[0], lines[1], lines[2], None, int(lines[3]))
+            cache = '\n'.join(lines[5:])
+            new_log.gen = Markov.from_json(cache)
+            return new_log
+        else:
+            return Chatlog(lines[0], lines[1], lines[2], lines[4:], int(lines[3]))

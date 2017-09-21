@@ -2,6 +2,7 @@
 
 import sys, os
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram.error import *
 from chatlog import *
 import logging
 import argparse
@@ -15,7 +16,9 @@ logger = logging.getLogger(__name__)
 chatlogs = {}
 disabled = {}
 
-GUILLERMO_ID = 8379173
+GUILLERMO_ID = "8379173"
+CHAT_INC = 5
+CHAT_SAVE = 15
 
 def wake(bot):
     directory = os.fsencode("chatlogs/")
@@ -25,7 +28,7 @@ def wake(bot):
         if filename.endswith(".txt"):
             chat = loadchat("chatlogs/" + filename)
             chatlogs[chat.id] = chat
-            print("loaded chat " + chat.id)
+            print("loaded chat " + chat.title + " [" + chat.id + "]")
             continue
         else:
             continue
@@ -98,12 +101,14 @@ def read(bot, update):
         # TO DO: añadir % de que haga reply en vez de send
         try:
             bot.sendMessage(chatlog.id, msg)
-        except TelegramError:
-            chatlog.set_freq(chatlog.freq + 20)
+        except TimedOut:
+            chatlog.set_freq(chatlog.freq + CHAT_INC)
+            print("Increased freq for chat " + chatlog.title + " [" + chatlog.id + "]")
         if get_chatname(chat) != chatlog.title:
             chatlog.set_title(get_chatname(chat))
         savechat(chatlog)
-
+    elif chatlog.freq > CHAT_SAVE and chatlog.get_count()%CHAT_SAVE == 0:
+        savechat(chatlog)
     chatlogs[chatlog.id] = chatlog
 
 def speak(bot, update):
@@ -121,12 +126,10 @@ def speak(bot, update):
     msg = chatlog.speak()
     update.message.reply_text(msg)
     savechat(chatlog)
-
     chatlogs[chatlog.id] = chatlog
 
 def get_chatlogs(bot, update):
-    global GUILLERMO_ID
-    if update.message.chat.id is GUILLERMO_ID:
+    if str(update.message.chat.id) == GUILLERMO_ID:
         m = "I have these chatlogs:"
         for c in chatlogs:
             m += "\n" + chatlogs[c].id + " " + chatlogs[c].title
@@ -157,6 +160,7 @@ def set_freq(bot, update):
             value = int(value)
             value = chatlogs[ident].set_freq(value)
             reply = "Frequency of speaking set to " + str(value)
+            savechat(chatlogs[ident])
         except:
             reply = "Format was confusing; frequency not changed from " + str(chatlogs[ident].freq)
     update.message.reply_text(reply)
