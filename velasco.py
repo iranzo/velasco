@@ -19,14 +19,16 @@ disabled = {}
 GUILLERMO_ID = "8379173"
 CHAT_INC = 5
 CHAT_SAVE = 15
+LOG_DIR = "chatlogs/"
+LOG_EXT = ".txt"
 
 def wake(bot):
-    directory = os.fsencode("chatlogs/")
+    directory = os.fsencode(LOG_DIR)
 
     for file in os.listdir(directory):
         filename = os.fsdecode(file)
-        if filename.endswith(".txt"):
-            chat = loadchat("chatlogs/" + filename)
+        if filename.endswith(LOG_EXT):
+            chat = loadchat(LOG_DIR + filename)
             chatlogs[chat.id] = chat
             print("loaded chat " + chat.title + " [" + chat.id + "]")
             continue
@@ -45,7 +47,7 @@ def start(bot, update):
     update.message.reply_text('cowabunga')
 
 def savechat(chatlog):
-    open_file = open('chatlogs/' + chatlog.id + '.txt', 'w')
+    open_file = open(LOG_DIR + chatlog.id + LOG_EXT, 'w')
     open_file.write(chatlog.to_txt())
     open_file.close()
 
@@ -70,7 +72,11 @@ def about(bot, update):
     update.message.reply_text('I am yet another Markov Bot experiment. I read everything you type to me and then spit back nonsensical messages that look like yours')
 
 def echo(bot, update):
-    update.message.reply_text(update.message.text)
+    text = update.message.text.split(None, 2)
+    if len(text) > 1:
+        text = text[1]
+        chatlog.add_msg(text)
+        update.message.reply_text(text)
 
 def error(bot, update, error):
     logger.warn('Update "%s" caused error "%s"' % (update, error))
@@ -168,7 +174,7 @@ def set_freq(bot, update):
 def stop(bot, update):
     chatlog = chatlogs[update.message.chat.id]
     del chatlogs[chatlog.id]
-    os.remove("chatlogs/" + chatlog.id + ".txt")
+    os.remove(LOG_DIR + chatlog.id + LOG_EXT)
     print("I got blocked. Removed user " + chatlog.id)
 
 def main():
@@ -197,7 +203,7 @@ def main():
     # dp.add_handler(MessageHandler(Filters.text, echo))
     dp.add_handler(MessageHandler(Filters.text, read))
 
-    # chatlog all errors
+    # log all errors
     dp.add_error_handler(error)
 
     wake(updater.bot)

@@ -59,3 +59,7 @@ class Chatlog(object):
             return new_log
         else:
             return Chatlog(lines[0], lines[1], lines[2], lines[4:], int(lines[3]))
+
+    def fuse_with(chatlog):
+        self.count += chatlog.count
+        self.gen.fuse_with(chatlog.gen)

@@ -30,8 +30,8 @@ def triples(wordlist):
 
 class Markov(object):
     def __init__(self, text=None, from_json=False):
+        self.cache = {}
         if not from_json:
-            self.cache = {}
             if text is not None:
                 for line in text:
                     self.add_text(line)
@@ -73,3 +73,11 @@ class Markov(object):
             else:
                 w1, w2 = w2, random.choice(self.cache[getkey(w1, w2)])
         return ' '.join(gen_words)
+
+    def fuse_with(self, gen):
+        d = gen.cache
+        for key in gen.cache:
+            if key in self.cache:
+                self.cache[key].extend(d[key])
+            else:
+                self.cache[key] = list(d[key])
