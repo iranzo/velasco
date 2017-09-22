@@ -6,6 +6,7 @@ from telegram.error import *
 from chatlog import *
 import logging
 import argparse
+import random
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -14,13 +15,14 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 chatlogs = {}
-disabled = {}
 
-GUILLERMO_ID = "8379173"
+ADMIN_ID = 0
 CHAT_INC = 5
 CHAT_SAVE = 15
 LOG_DIR = "chatlogs/"
 LOG_EXT = ".txt"
+REPL_CHANCE = 10/100
+REPT_CHANCE = 5/100
 
 def wake(bot):
     directory = os.fsencode(LOG_DIR)
@@ -62,6 +64,7 @@ def help(bot, update):
 
 /start - I say hi.
 /about - What I'm about.
+/explain - I explain how I work.
 /help - I send this message.
 /count - I tell you how many messages from this chat I remember.
 /freq - Change the frequency of both my messages and the times I save my learned vocabulary. (Maximum of 100000)
@@ -69,7 +72,10 @@ def help(bot, update):
     """)
 
 def about(bot, update):
-    update.message.reply_text('I am yet another Markov Bot experiment. I read everything you type to me and then spit back nonsensical messages that look like yours')
+    update.message.reply_text('I am yet another Markov Bot experiment. I read everything you type to me and then spit back nonsensical messages that look like yours\n\nYou can send /explain if you want further explanation')
+
+def explain(bot, update):
+    update.message.reply_text('I decompose every message I read in groups of 3 consecutive words, so for each consecutive pair I save the word that can follow them. I then use this to make my own messages. At first I will only repeat your messages because for each 2 words I will have very few possible following words.\n\nI also separate my vocabulary by chats, so anything I learn in one chat I will only say in that chat. For privacy, you know. Also, I save my vocabulary in the form of a json dictionary, so no logs are kept.\n\nMy default frequency in private chats is one message of mine from each 2 messages received, and in group chats it\'s 10 messages I read for each message I send.')
 
 def echo(bot, update):
     text = update.message.text.split(None, 2)
@@ -102,11 +108,23 @@ def read(bot, update):
     else:
         chatlog = chatlogs[ident]
     chatlog.add_msg(update.message.text)
-    if chatlog.get_count()%chatlog.freq == 0:
+    replied = update.message.reply_to_message
+    if (replied is not None) and (replied.from_user.name == "@velascobot") and (random.random() <= 0.5):
         msg = chatlog.speak()
-        # TO DO: añadir % de que haga reply en vez de send
-        try:
+        update.message.reply_text(msg)
+        if random.random() <= REPT_CHANCE:
+            msg = chatlog.speak()
             bot.sendMessage(chatlog.id, msg)
+    elif chatlog.get_count()%chatlog.freq == 0:
+        msg = chatlog.speak()
+        try:
+            if random.random() <= REPL_CHANCE:
+                update.message.reply_text(msg)
+            else:
+                bot.sendMessage(chatlog.id, msg)
+            if random.random() <= REPT_CHANCE:
+                msg = chatlog.speak()
+                bot.sendMessage(chatlog.id, msg)
         except TimedOut:
             chatlog.set_freq(chatlog.freq + CHAT_INC)
             print("Increased freq for chat " + chatlog.title + " [" + chatlog.id + "]")
@@ -135,11 +153,16 @@ def speak(bot, update):
     chatlogs[chatlog.id] = chatlog
 
 def get_chatlogs(bot, update):
-    if str(update.message.chat.id) == GUILLERMO_ID:
-        m = "I have these chatlogs:"
-        for c in chatlogs:
-            m += "\n" + chatlogs[c].id + " " + chatlogs[c].title
-        bot.sendMessage(GUILLERMO_ID, m)
+    m = "I have these chatlogs:"
+    for c in chatlogs:
+        m += "\n" + chatlogs[c].id + " " + chatlogs[c].title
+    update.message.reply_text(m)
+
+def get_id(bot, update):
+    update.message.reply_text("This chat's id is: " + str(update.message.chat.id))
+
+def get_name(bot, update):
+    update.message.reply_text("Your name is: " + update.message.from_user.name)
 
 def get_count(bot, update):
     ident = str(update.message.chat.id)
@@ -172,19 +195,22 @@ def set_freq(bot, update):
     update.message.reply_text(reply)
 
 def stop(bot, update):
+    global ADMIN_ID
     chatlog = chatlogs[update.message.chat.id]
     del chatlogs[chatlog.id]
     os.remove(LOG_DIR + chatlog.id + LOG_EXT)
     print("I got blocked. Removed user " + chatlog.id)
 
 def main():
-    parser = argparse.ArgumentParser(description='A Telegram markovbot.')
+    parser = argparse.ArgumentParser(description='A Telegram markov bot.')
     parser.add_argument('token', metavar='TOKEN', help='The Bot Token to work with the Telegram Bot API')
+    parser.add_argument('admin_id', metavar='ADMIN_ID', type=int, help='The ID of the Telegram user that manages this bot')
 
     args = parser.parse_args()
 
     # Create the EventHandler and pass it your bot's token.
     updater = Updater(args.token)
+    ADMIN_ID = args.admin_id
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -195,7 +221,9 @@ def main():
     dp.add_handler(CommandHandler("help", help))
     dp.add_handler(CommandHandler("count", get_count))
     dp.add_handler(CommandHandler("freq", set_freq))
-    dp.add_handler(CommandHandler("list", get_chatlogs))
+    dp.add_handler(CommandHandler("list", get_chatlogs, Filters.chat(args.admin_id)))
+    dp.add_handler(CommandHandler("user", get_name, Filters.chat(args.admin_id)))
+    dp.add_handler(CommandHandler("id", get_id))
     dp.add_handler(CommandHandler("stop", stop))
     dp.add_handler(CommandHandler("speak", speak))
 

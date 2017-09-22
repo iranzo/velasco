@@ -9,7 +9,7 @@ class Chatlog(object):
         self.title = title
         if freq is None:
             if "group" in chattype:
-                freq = 15
+                freq = 10
             #elif chattype is "private":
             else:
                 freq = 2
@@ -47,6 +47,7 @@ class Chatlog(object):
         lines.append(self.title)
         lines.append(str(self.freq))
         lines.append("dict:")
+        lines.append(str(self.count))
         txt = '\n'.join(lines)
         return txt + '\n' + self.gen.to_json()
 
@@ -54,8 +55,11 @@ class Chatlog(object):
         lines = text.splitlines()
         if(lines[4] == "dict:"):
             new_log = Chatlog(lines[0], lines[1], lines[2], None, int(lines[3]))
-            cache = '\n'.join(lines[5:])
+            new_log.count = int(lines[5])
+            cache = '\n'.join(lines[6:])
             new_log.gen = Markov.from_json(cache)
+            if new_log.count < 0:
+                new_log.count = new_log.gen.new_count()
             return new_log
         else:
             return Chatlog(lines[0], lines[1], lines[2], lines[4:], int(lines[3]))

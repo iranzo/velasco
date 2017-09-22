@@ -7,14 +7,27 @@ HEAD = "\n!kvl"
 TAIL = "!kvl"
 
 def trim_and_split(text):
-    words = text.split(' ')
-    for i in range(len(words)):
-        words[i] = words[i].strip(' \t')
+    words = text.replace('\n', '\n ').split(' ')
+    i = 0
+    while i < len(words):
+        w = words[i].strip(' \t')
+        if len(w) > 0:
+            words[i] = w
+        else:
+            del words[i]
+            i -= 1
+        i += 1
     return words
 
 def getkey(w1, w2):
     key = (w1.strip().casefold(), w2.strip().casefold())
     return str(key)
+
+def getwords(key):
+    words = key.strip('()').split(', ')
+    for i in range(len(words)):
+        words[i].strip('\'')
+    return words
 
 def triples(wordlist):
     """ Generates triples from the given data string. So if our string were
@@ -81,3 +94,11 @@ class Markov(object):
                 self.cache[key].extend(d[key])
             else:
                 self.cache[key] = list(d[key])
+
+    def new_count(self):
+        count = 0
+        for key in self.cache:
+            for word in self.cache[key]:
+                if word == "!kvl":
+                    count += 1
+        return count
