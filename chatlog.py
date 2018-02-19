@@ -3,7 +3,7 @@
 from markov import *
 
 class Chatlog(object):
-    def __init__(self, ident, chattype, title, text=None, freq=None):
+    def __init__(self, ident, chattype, title, text=None, freq=None, answer=0.5):
         self.id = str(ident)
         self.type = chattype
         self.title = title
@@ -18,6 +18,7 @@ class Chatlog(object):
             self.count = len(text)
         else:
             self.count = 0
+        self.answer = answer
         self.gen = Markov(text)
 
     def set_title(self, title):
@@ -31,6 +32,15 @@ class Chatlog(object):
         self.freq = freq
         return self.freq
 
+    def set_answer_freq(self, freq):
+        if freq > 1:
+            self.answer = 1
+        elif freq < 0:
+            self.answer = 0
+        else:
+            self.answer = freq
+        return self.answer
+
     def add_msg(self, message):
         self.gen.add_text(message + " !kvl")
         self.count += 1
@@ -41,19 +51,36 @@ class Chatlog(object):
     def get_count(self):
         return self.count
 
+    def answering(self, rand):
+        if self.answer == 1:
+            return True
+        elif self.answer == 0:
+            return False
+        return rand <= self.answer
+
     def to_txt(self):
-        lines = [self.id]
-        lines.append(self.type)
-        lines.append(self.title)
-        lines.append(str(self.freq))
-        lines.append("dict:")
-        lines.append(str(self.count))
+        lines = ["DICT=v2"]
+        lines.append("CHAT_ID=" + self.id)
+        lines.append("CHAT_TYPE=" + self.type)
+        lines.append("CHAT_NAME=" + self.title)
+        lines.append("MESSAGE_FREQ=" + str(self.freq))
+        lines.append("ANSWER_FREQ=" + str(self.answer))
+        lines.append("WORD_COUNT=" + str(self.count))
+        lines.append("WORD_DICT=")
         txt = '\n'.join(lines)
         return txt + '\n' + self.gen.to_json()
 
     def from_txt(text):
         lines = text.splitlines()
-        if(lines[4] == "dict:"):
+        if(parse_line(lines[0]) == "v2"):
+            new_log = Chatlog(parse_line(lines[1]), parse_line(lines[2]), parse_line(lines[3]), None, int(parse_line(lines[4])), float(parse_line(lines[5])))
+            new_log.count = int(parse_line(lines[6]))
+            cache = '\n'.join(lines[8:])
+            new_log.gen = Markov.from_json(cache)
+            if new_log.count < 0:
+                new_log.count = new_log.gen.new_count()
+            return new_log
+        elif(lines[4] == "dict:"):
             new_log = Chatlog(lines[0], lines[1], lines[2], None, int(lines[3]))
             new_log.count = int(lines[5])
             cache = '\n'.join(lines[6:])
@@ -63,6 +90,12 @@ class Chatlog(object):
             return new_log
         else:
             return Chatlog(lines[0], lines[1], lines[2], lines[4:], int(lines[3]))
+
+    def parse_line(line):
+        s = line.split('=')
+        if len(s) < 2:
+            return ""
+        return s[1]
 
     def fuse_with(chatlog):
         self.count += chatlog.count

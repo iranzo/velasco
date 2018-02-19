@@ -9,7 +9,7 @@ import argparse
 import random
 
 # Enable logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s - velascobot',
                     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,10 @@ def savechat(chatlog):
 
 def loadchat(path):
     open_file = open(path, 'r')
-    chat = Chatlog.from_txt(open_file.read())
+    try:
+        chat = Chatlog.from_txt(open_file.read())
+    except:
+        pass
     open_file.close()
     return chat
 
@@ -67,8 +70,9 @@ def help(bot, update):
 /explain - I explain how I work.
 /help - I send this message.
 /count - I tell you how many messages from this chat I remember.
-/freq - Change the frequency of both my messages and the times I save my learned vocabulary. (Maximum of 100000)
+/freq - Change the frequency of my messages. (Maximum of 100000)
 /speak - Forces me to speak.
+/answer - Change the probability to answer to a reply. (Decimal between 0 and 1)
     """)
 
 def about(bot, update):
@@ -78,7 +82,7 @@ def explain(bot, update):
     update.message.reply_text('I decompose every message I read in groups of 3 consecutive words, so for each consecutive pair I save the word that can follow them. I then use this to make my own messages. At first I will only repeat your messages because for each 2 words I will have very few possible following words.\n\nI also separate my vocabulary by chats, so anything I learn in one chat I will only say in that chat. For privacy, you know. Also, I save my vocabulary in the form of a json dictionary, so no logs are kept.\n\nMy default frequency in private chats is one message of mine from each 2 messages received, and in group chats it\'s 10 messages I read for each message I send.')
 
 def echo(bot, update):
-    text = update.message.text.split(None, 2)
+    text = update.message.text.split(None, maxsplit=1)
     if len(text) > 1:
         text = text[1]
         chatlog.add_msg(text)
@@ -109,7 +113,8 @@ def read(bot, update):
         chatlog = chatlogs[ident]
     chatlog.add_msg(update.message.text)
     replied = update.message.reply_to_message
-    if (replied is not None) and (replied.from_user.name == "@velascobot") and (random.random() <= 0.5):
+    if (replied is not None) and (replied.from_user.name == "@velascobot") and chatlog.answering(random.random()):
+        print("They're talking to me, I'm answering back")
         msg = chatlog.speak()
         update.message.reply_text(msg)
         if random.random() <= REPT_CHANCE:
@@ -119,10 +124,13 @@ def read(bot, update):
         msg = chatlog.speak()
         try:
             if random.random() <= REPL_CHANCE:
+                print("I made a reply")
                 update.message.reply_text(msg)
             else:
+                print("I sent a message")
                 bot.sendMessage(chatlog.id, msg)
             if random.random() <= REPT_CHANCE:
+                print("And a followup")
                 msg = chatlog.speak()
                 bot.sendMessage(chatlog.id, msg)
         except TimedOut:
@@ -194,12 +202,32 @@ def set_freq(bot, update):
             reply = "Format was confusing; frequency not changed from " + str(chatlogs[ident].freq)
     update.message.reply_text(reply)
 
+def set_answer_freq(bot, update):
+    ident = str(update.message.chat.id)
+    if not ident in chatlogs:
+        chat = update.message.chat
+        title = get_chatname(chat)
+        chatlog = Chatlog(chat.id, chat.type, title)
+        chatlogs[chatlog.id] = chatlog
+    if not len(update.message.text.split()) > 1:
+        reply = "Current answer probability is " + str(chatlogs[ident].answer)
+    else:
+        try:
+            value = update.message.text.split()[1]
+            value = float(value)
+            value = chatlogs[ident].set_answer_freq(value)
+            reply = "Probability of answering set to " + str(value)
+            savechat(chatlogs[ident])
+        except:
+            reply = "Format was confusing; answer probability not changed from " + str(chatlogs[ident].answer)
+    update.message.reply_text(reply)
+
 def stop(bot, update):
     global ADMIN_ID
     chatlog = chatlogs[update.message.chat.id]
-    del chatlogs[chatlog.id]
-    os.remove(LOG_DIR + chatlog.id + LOG_EXT)
-    print("I got blocked. Removed user " + chatlog.id)
+    #del chatlogs[chatlog.id]
+    #os.remove(LOG_DIR + chatlog.id + LOG_EXT)
+    print("I got blocked by user " + chatlog.id)
 
 def main():
     parser = argparse.ArgumentParser(description='A Telegram markov bot.')
@@ -226,6 +254,7 @@ def main():
     dp.add_handler(CommandHandler("id", get_id))
     dp.add_handler(CommandHandler("stop", stop))
     dp.add_handler(CommandHandler("speak", speak))
+    dp.add_handler(CommandHandler("answer", set_answer_freq))
 
     # on noncommand i.e message - echo the message on Telegram
     # dp.add_handler(MessageHandler(Filters.text, echo))

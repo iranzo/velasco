@@ -58,7 +58,8 @@ class Markov(object):
         return Markov(string, True)
 
     def add_text(self, text):
-        words = trim_and_split(HEAD + " " + text)
+        words = [HEAD]
+        words.extend(trim_and_split(text))
         self.database(words)
 
     def database(self, wordlist):
@@ -81,7 +82,7 @@ class Markov(object):
         for i in range(size):
             gen_words.append(w1)
             if w2 == TAIL or not getkey(w1, w2) in self.cache:
-                print("Generated text")
+                # print("Generated text")
                 break
             else:
                 w1, w2 = w2, random.choice(self.cache[getkey(w1, w2)])
