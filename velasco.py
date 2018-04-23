@@ -31,22 +31,23 @@ def wake(bot):
         filename = os.fsdecode(file)
         if filename.endswith(LOG_EXT):
             chat = loadchat(LOG_DIR + filename)
-            chatlogs[chat.id] = chat
-            print("loaded chat " + chat.title + " [" + chat.id + "]")
+            if chat is not None:
+                chatlogs[chat.id] = chat
+                print("loaded chat " + chat.title + " [" + chat.id + "]")
             continue
         else:
             continue
 """
     for c in chatlogs:
         try:
-            bot.sendMessage(chatlogs[c].id, "Good morning. I just woke up")
+            send_message(bot, update, "Good morning. I just woke up", False)
         except:
             pass
             #del chatlogs[c]
 """
 
 def start(bot, update):
-    update.message.reply_text('cowabunga')
+    update.message.reply_text()
 
 def savechat(chatlog):
     open_file = open(LOG_DIR + chatlog.id + LOG_EXT, 'w')
@@ -54,7 +55,9 @@ def savechat(chatlog):
     open_file.close()
 
 def loadchat(path):
+    #print("Loading chat: " + path)
     open_file = open(path, 'r')
+    chat = None
     try:
         chat = Chatlog.from_txt(open_file.read())
     except:
@@ -111,28 +114,33 @@ def read(bot, update):
         chatlog = Chatlog(chat.id, chat.type, title)
     else:
         chatlog = chatlogs[ident]
-    chatlog.add_msg(update.message.text)
+
+    if update.message.text is not None:
+        chatlog.add_msg(update.message.text)
+    elif update.message.sticker is not None:
+        chatlog.add_sticker(update.message.sticker.file_id)
+
     replied = update.message.reply_to_message
     if (replied is not None) and (replied.from_user.name == "@velascobot") and chatlog.answering(random.random()):
         print("They're talking to me, I'm answering back")
         msg = chatlog.speak()
-        update.message.reply_text(msg)
+        send_message(bot, update, msg, True)
         if random.random() <= REPT_CHANCE:
             msg = chatlog.speak()
-            bot.sendMessage(chatlog.id, msg)
+            send_message(bot, update, msg, False)
     elif chatlog.get_count()%chatlog.freq == 0:
         msg = chatlog.speak()
         try:
             if random.random() <= REPL_CHANCE:
                 print("I made a reply")
-                update.message.reply_text(msg)
+                send_message(bot, update, msg, True)
             else:
                 print("I sent a message")
-                bot.sendMessage(chatlog.id, msg)
+                send_message(bot, update, msg, False)
             if random.random() <= REPT_CHANCE:
                 print("And a followup")
                 msg = chatlog.speak()
-                bot.sendMessage(chatlog.id, msg)
+                send_message(bot, update, msg, False)
         except TimedOut:
             chatlog.set_freq(chatlog.freq + CHAT_INC)
             print("Increased freq for chat " + chatlog.title + " [" + chatlog.id + "]")
@@ -156,15 +164,27 @@ def speak(bot, update):
     if len(text) > 1:
         chatlog.add_msg(' '.join(text[1:]))
     msg = chatlog.speak()
-    update.message.reply_text(msg)
+    send_message(bot, update, msg, True)
     savechat(chatlog)
     chatlogs[chatlog.id] = chatlog
+
+def send_message(bot, update, msg, is_reply):
+    words = msg.split()
+    if words[0] == STICKER_TAG:
+        if is_reply:
+            update.message.reply_sticker(words[1])
+        else:
+            bot.sendSticker(update.message.chat_id, words[1])
+    elif is_reply:
+        update.message.reply_text(msg)
+    else:
+        bot.sendMessage(update.message.chat.id, msg)
 
 def get_chatlogs(bot, update):
     m = "I have these chatlogs:"
     for c in chatlogs:
         m += "\n" + chatlogs[c].id + " " + chatlogs[c].title
-    update.message.reply_text(m)
+    send_message(bot, update, msg, True)
 
 def get_id(bot, update):
     update.message.reply_text("This chat's id is: " + str(update.message.chat.id))
@@ -258,7 +278,7 @@ def main():
 
     # on noncommand i.e message - echo the message on Telegram
     # dp.add_handler(MessageHandler(Filters.text, echo))
-    dp.add_handler(MessageHandler(Filters.text, read))
+    dp.add_handler(MessageHandler((Filters.text | Filters.sticker), read))
 
     # log all errors
     dp.add_error_handler(error)

@@ -2,6 +2,13 @@
 
 from markov import *
 
+def parse_line(l):
+    s = l.split('=')
+    if len(s) < 2:
+        return ""
+    else:
+        return s[1]
+
 class Chatlog(object):
     def __init__(self, ident, chattype, title, text=None, freq=None, answer=0.5):
         self.id = str(ident)
@@ -42,7 +49,11 @@ class Chatlog(object):
         return self.answer
 
     def add_msg(self, message):
-        self.gen.add_text(message + " !kvl")
+        self.gen.add_text(message + ' ' + TAIL)
+        self.count += 1
+
+    def add_sticker(self, file_id):
+        self.gen.add_text(STICKER_TAG + ' ' + file_id + ' ' + TAIL)
         self.count += 1
 
     def speak(self):
@@ -72,6 +83,8 @@ class Chatlog(object):
 
     def from_txt(text):
         lines = text.splitlines()
+        #print("Line 4=" + lines[4])
+        print("Line 0=" + parse_line(lines[0]))
         if(parse_line(lines[0]) == "v2"):
             new_log = Chatlog(parse_line(lines[1]), parse_line(lines[2]), parse_line(lines[3]), None, int(parse_line(lines[4])), float(parse_line(lines[5])))
             new_log.count = int(parse_line(lines[6]))
@@ -90,12 +103,6 @@ class Chatlog(object):
             return new_log
         else:
             return Chatlog(lines[0], lines[1], lines[2], lines[4:], int(lines[3]))
-
-    def parse_line(line):
-        s = line.split('=')
-        if len(s) < 2:
-            return ""
-        return s[1]
 
     def fuse_with(chatlog):
         self.count += chatlog.count

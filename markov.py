@@ -3,8 +3,9 @@
 import random
 import json
 
-HEAD = "\n!kvl"
-TAIL = "!kvl"
+HEAD = "\n^MESSAGE_SEPARATOR^"
+TAIL = "^MESSAGE_SEPARATOR^"
+STICKER_TAG = "^IS_STICKER^"
 
 def trim_and_split(text):
     words = text.replace('\n', '\n ').split(' ')
@@ -100,6 +101,6 @@ class Markov(object):
         count = 0
         for key in self.cache:
             for word in self.cache[key]:
-                if word == "!kvl":
+                if word == MESSAGE_SEPARATOR:
                     count += 1
         return count
