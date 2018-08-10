@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 chatlogs = {}
 
 ADMIN_ID = 0
+WAKEUP = False
 CHAT_INC = 5
 CHAT_SAVE = 15
 LOG_DIR = "chatlogs/"
@@ -37,17 +38,17 @@ def wake(bot):
             continue
         else:
             continue
-"""
+
     for c in chatlogs:
         try:
-            send_message(bot, update, "Good morning. I just woke up", False)
+            if WAKEUP:
+                send_message(bot, update, "Good morning. I just woke up")
         except:
             pass
             #del chatlogs[c]
-"""
 
 def start(bot, update):
-    update.message.reply_text()
+    update.message.reply_text("Hello there! Ask me for /help to see an overview of the available commands.")
 
 def savechat(chatlog):
     open_file = open(LOG_DIR + chatlog.id + LOG_EXT, 'w')
@@ -120,27 +121,37 @@ def read(bot, update):
     elif update.message.sticker is not None:
         chatlog.add_sticker(update.message.sticker.file_id)
 
+    if chatlog.get_count()%chatlog.freq == 1:
+        chatlog.restart_replyables(update.message.message_id)
+    else:
+        chatlog.add_replyable(update.message.message_id)
+
     replied = update.message.reply_to_message
-    if (replied is not None) and (replied.from_user.name == "@velascobot") and chatlog.answering(random.random()):
+    reply_text = update.message.text.casefold()
+    to_reply = ((replied is not None) and (replied.from_user.name == "@velascobot")) or ("@velascobot" in reply_text) or ("velasco" in reply_text and "@velasco" not in reply_text)
+
+    if to_reply and chatlog.answering(random.random()):
         print("They're talking to me, I'm answering back")
         msg = chatlog.speak()
-        send_message(bot, update, msg, True)
+        send_message(bot, update, msg, update.message.message_id)
+
         if random.random() <= REPT_CHANCE:
             msg = chatlog.speak()
-            send_message(bot, update, msg, False)
+            send_message(bot, update, msg)
+
     elif chatlog.get_count()%chatlog.freq == 0:
         msg = chatlog.speak()
         try:
             if random.random() <= REPL_CHANCE:
                 print("I made a reply")
-                send_message(bot, update, msg, True)
+                send_message(bot, update, msg, chatlog.get_replyable())
             else:
                 print("I sent a message")
-                send_message(bot, update, msg, False)
+                send_message(bot, update, msg)
             if random.random() <= REPT_CHANCE:
                 print("And a followup")
                 msg = chatlog.speak()
-                send_message(bot, update, msg, False)
+                send_message(bot, update, msg)
         except TimedOut:
             chatlog.set_freq(chatlog.freq + CHAT_INC)
             print("Increased freq for chat " + chatlog.title + " [" + chatlog.id + "]")
@@ -164,19 +175,19 @@ def speak(bot, update):
     if len(text) > 1:
         chatlog.add_msg(' '.join(text[1:]))
     msg = chatlog.speak()
-    send_message(bot, update, msg, True)
+    send_message(bot, update, msg, update.message.message_id)
     savechat(chatlog)
     chatlogs[chatlog.id] = chatlog
 
-def send_message(bot, update, msg, is_reply):
+def send_message(bot, update, msg, reply_id):
     words = msg.split()
     if words[0] == STICKER_TAG:
         if is_reply:
             update.message.reply_sticker(words[1])
         else:
             bot.sendSticker(update.message.chat_id, words[1])
-    elif is_reply:
-        update.message.reply_text(msg)
+    elif reply_id is not None:
+        bot.sendMessage(update.message.chat.id, msg, reply_to_message_id=reply_id)
     else:
         bot.sendMessage(update.message.chat.id, msg)
 
@@ -184,7 +195,7 @@ def get_chatlogs(bot, update):
     m = "I have these chatlogs:"
     for c in chatlogs:
         m += "\n" + chatlogs[c].id + " " + chatlogs[c].title
-    send_message(bot, update, msg, True)
+    send_message(bot, update, msg, update.message.message_id)
 
 def get_id(bot, update):
     update.message.reply_text("This chat's id is: " + str(update.message.chat.id))
@@ -253,12 +264,15 @@ def main():
     parser = argparse.ArgumentParser(description='A Telegram markov bot.')
     parser.add_argument('token', metavar='TOKEN', help='The Bot Token to work with the Telegram Bot API')
     parser.add_argument('admin_id', metavar='ADMIN_ID', type=int, help='The ID of the Telegram user that manages this bot')
+    parser.add_argument('-w', '--wakeup', metavar='WAKEUP_MSG', action='store_true', help='Flag that makes the bot send a first message to all chats during wake up.')
 
     args = parser.parse_args()
 
     # Create the EventHandler and pass it your bot's token.
     updater = Updater(args.token)
     ADMIN_ID = args.admin_id
+    if args.wakeup:
+        WAKEUP = True
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -266,6 +280,7 @@ def main():
     # on different commands - answer in Telegram
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("about", about))
+    dp.add_handler(CommandHandler("explain", explain))
     dp.add_handler(CommandHandler("help", help))
     dp.add_handler(CommandHandler("count", get_count))
     dp.add_handler(CommandHandler("freq", set_freq))

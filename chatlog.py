@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import random
 from markov import *
 
 def parse_line(l):
@@ -25,6 +26,7 @@ class Chatlog(object):
             self.count = len(text)
         else:
             self.count = 0
+        self.replyables = []
         self.answer = answer
         self.gen = Markov(text)
 
@@ -68,6 +70,18 @@ class Chatlog(object):
         elif self.answer == 0:
             return False
         return rand <= self.answer
+
+    def add_replyable(self, msg_id):
+        self.replyables.append(msg_id)
+
+    def restart_replyables(self, msg_id):
+        if msg_id is not None:
+            self.replyables = [msg_id]
+        else:
+            self.replyables = []
+
+    def get_replyable(self):
+        random.choice(self.replyables)
 
     def to_txt(self):
         lines = ["DICT=v2"]
