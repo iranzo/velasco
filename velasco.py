@@ -42,7 +42,7 @@ def wake(bot):
     for c in chatlogs:
         try:
             print("Waking up on chat {}.".format(c))
-            if WAKEUP:
+            if WAKEUP and "group" in chatlogs[c].type:
                 bot.sendMessage(c, "Good morning. I just woke up")
         except:
             pass
