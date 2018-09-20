@@ -76,7 +76,8 @@ def help(bot, update):
 /count - I tell you how many messages from this chat I remember.
 /freq - Change the frequency of my messages. (Maximum of 100000)
 /speak - Forces me to speak.
-/answer - Change the probability to answer to a reply. (Decimal between 0 and 1)
+/answer - Change the probability to answer to a reply. (Decimal between 0 and 1).
+/restrict - Toggle restriction of configuration commands to admins only.
     """)
 
 def about(bot, update):
@@ -171,6 +172,12 @@ def speak(bot, update):
         chatlog = Chatlog(chat.id, chat.type, title)
     else:
         chatlog = chatlogs[ident]
+
+    if chatlogs[ident].is_restricted():
+        user = update.message.chat.get_member(update.message.from_user.id)
+        if not user_is_admin(user):
+            return
+
     text = update.message.text.split()
     if len(text) > 1:
         chatlog.add_msg(' '.join(text[1:]))
@@ -213,6 +220,12 @@ def get_count(bot, update):
     reply += " messages."
     update.message.reply_text(reply)
 
+def user_is_admin(member):
+    global ADMIN_ID
+    print("user {} requesting a restricted action".format(str(member.user.id)))
+    print("Creator ID is {}".format(str(ADMIN_ID)))
+    return (member.status == 'creator') or (member.status == 'administrator') or (member.user.id == ADMIN_ID)
+
 def set_freq(bot, update):
     ident = str(update.message.chat.id)
     if not ident in chatlogs:
@@ -220,9 +233,16 @@ def set_freq(bot, update):
         title = get_chatname(chat)
         chatlog = Chatlog(chat.id, chat.type, title)
         chatlogs[chatlog.id] = chatlog
+
     if not len(update.message.text.split()) > 1:
         reply = "Current frequency is " + str(chatlogs[ident].freq)
     else:
+        if chatlogs[ident].is_restricted():
+            user = update.message.chat.get_member(update.message.from_user.id)
+            if not user_is_admin(user):
+                reply = "You do not have permissions to do that."
+                update.message.reply_text(reply)
+                return
         try:
             value = update.message.text.split()[1]
             value = int(value)
@@ -240,9 +260,16 @@ def set_answer_freq(bot, update):
         title = get_chatname(chat)
         chatlog = Chatlog(chat.id, chat.type, title)
         chatlogs[chatlog.id] = chatlog
+
     if not len(update.message.text.split()) > 1:
         reply = "Current answer probability is " + str(chatlogs[ident].answer)
     else:
+        if chatlogs[ident].is_restricted():
+            user = chat.get_member(update.message.from_user.id)
+            if not user_is_admin(user):
+                reply = "You do not have permissions to do that."
+                update.message.reply_text(reply)
+                return
         try:
             value = update.message.text.split()[1]
             value = float(value)
@@ -253,6 +280,28 @@ def set_answer_freq(bot, update):
             reply = "Format was confusing; answer probability not changed from " + str(chatlogs[ident].answer)
     update.message.reply_text(reply)
 
+def restrict(bot, update):
+    if "group" not in update.message.chat.type:
+        update.message.reply_text("That only works in groups.")
+        return
+    ident = str(update.message.chat.id)
+    if not ident in chatlogs:
+        chat = update.message.chat
+        title = get_chatname(chat)
+        chatlog = Chatlog(chat.id, chat.type, title)
+        chatlogs[chatlog.id] = chatlog
+    else:
+        chatlog = chatlogs[ident]
+    if chatlog.is_restricted():
+        user = update.message.chat.get_member(update.message.from_user.id)
+        if not user_is_admin(user):
+            reply = "You do not have permissions to do that."
+            update.message.reply_text(reply)
+            return
+    chatlogs[ident].toggle_restrict()
+    reply = (chatlogs[ident].is_restricted() and "I will only let admins " or "I will let everyone ") + "configure me now."
+    update.message.reply_text(reply)
+
 def stop(bot, update):
     global ADMIN_ID
     chatlog = chatlogs[update.message.chat.id]
@@ -261,6 +310,7 @@ def stop(bot, update):
     print("I got blocked by user " + chatlog.id)
 
 def main():
+    global ADMIN_ID
     parser = argparse.ArgumentParser(description='A Telegram markov bot.')
     parser.add_argument('token', metavar='TOKEN', help='The Bot Token to work with the Telegram Bot API')
     parser.add_argument('admin_id', metavar='ADMIN_ID', type=int, help='The ID of the Telegram user that manages this bot')
@@ -290,6 +340,7 @@ def main():
     dp.add_handler(CommandHandler("stop", stop))
     dp.add_handler(CommandHandler("speak", speak))
     dp.add_handler(CommandHandler("answer", set_answer_freq))
+    dp.add_handler(CommandHandler("restrict", restrict))
 
     # on noncommand i.e message - echo the message on Telegram
     # dp.add_handler(MessageHandler(Filters.text, echo))

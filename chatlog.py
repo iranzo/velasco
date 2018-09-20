@@ -11,7 +11,7 @@ def parse_line(l):
         return s[1]
 
 class Chatlog(object):
-    def __init__(self, ident, chattype, title, text=None, freq=None, answer=0.5):
+    def __init__(self, ident, chattype, title, text=None, freq=None, answer=0.5, restricted=False):
         self.id = str(ident)
         self.type = chattype
         self.title = title
@@ -28,6 +28,7 @@ class Chatlog(object):
             self.count = 0
         self.replyables = []
         self.answer = answer
+        self.restricted = restricted
         self.gen = Markov(text)
 
     def set_title(self, title):
@@ -71,6 +72,7 @@ class Chatlog(object):
             return False
         return rand <= self.answer
 
+<<<<<<< Updated upstream
     def add_replyable(self, msg_id):
         self.replyables.append(msg_id)
 
@@ -82,14 +84,22 @@ class Chatlog(object):
 
     def get_replyable(self):
         random.choice(self.replyables)
+=======
+    def toggle_restrict(self):
+        self.restricted = (not self.restricted)
+
+    def is_restricted(self):
+        return self.restricted
+>>>>>>> Stashed changes
 
     def to_txt(self):
-        lines = ["DICT=v2"]
+        lines = ["DICT=v3"]
         lines.append("CHAT_ID=" + self.id)
         lines.append("CHAT_TYPE=" + self.type)
         lines.append("CHAT_NAME=" + self.title)
         lines.append("MESSAGE_FREQ=" + str(self.freq))
         lines.append("ANSWER_FREQ=" + str(self.answer))
+        lines.append("RESTRICTED=" + str(self.restricted))
         lines.append("WORD_COUNT=" + str(self.count))
         lines.append("WORD_DICT=")
         txt = '\n'.join(lines)
@@ -99,7 +109,15 @@ class Chatlog(object):
         lines = text.splitlines()
         #print("Line 4=" + lines[4])
         print("Line 0=" + parse_line(lines[0]))
-        if(parse_line(lines[0]) == "v2"):
+        if(parse_line(lines[0]) == "v3"):
+            new_log = Chatlog(parse_line(lines[1]), parse_line(lines[2]), parse_line(lines[3]), None, int(parse_line(lines[4])), float(parse_line(lines[5])), (parse_line(lines[6]) == 'True'))
+            new_log.count = int(parse_line(lines[7]))
+            cache = '\n'.join(lines[9:])
+            new_log.gen = Markov.from_json(cache)
+            if new_log.count < 0:
+                new_log.count = new_log.gen.new_count()
+            return new_log
+        elif(parse_line(lines[0]) == "v2"):
             new_log = Chatlog(parse_line(lines[1]), parse_line(lines[2]), parse_line(lines[3]), None, int(parse_line(lines[4])), float(parse_line(lines[5])))
             new_log.count = int(parse_line(lines[6]))
             cache = '\n'.join(lines[8:])
