@@ -72,7 +72,6 @@ class Chatlog(object):
             return False
         return rand <= self.answer
 
-<<<<<<< Updated upstream
     def add_replyable(self, msg_id):
         self.replyables.append(msg_id)
 
@@ -84,13 +83,11 @@ class Chatlog(object):
 
     def get_replyable(self):
         random.choice(self.replyables)
-=======
     def toggle_restrict(self):
         self.restricted = (not self.restricted)
 
     def is_restricted(self):
         return self.restricted
->>>>>>> Stashed changes
 
     def to_txt(self):
         lines = ["DICT=v3"]
@@ -108,7 +105,7 @@ class Chatlog(object):
     def from_txt(text):
         lines = text.splitlines()
         #print("Line 4=" + lines[4])
-        print("Line 0=" + parse_line(lines[0]))
+        print("-- Loaded " + parse_line(lines[0]) + ".")
         if(parse_line(lines[0]) == "v3"):
             new_log = Chatlog(parse_line(lines[1]), parse_line(lines[2]), parse_line(lines[3]), None, int(parse_line(lines[4])), float(parse_line(lines[5])), (parse_line(lines[6]) == 'True'))
             new_log.count = int(parse_line(lines[7]))

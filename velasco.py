@@ -41,8 +41,9 @@ def wake(bot):
 
     for c in chatlogs:
         try:
+            print("Waking up on chat {}.".format(c))
             if WAKEUP:
-                send_message(bot, update, "Good morning. I just woke up")
+                bot.sendMessage(c, "Good morning. I just woke up")
         except:
             pass
             #del chatlogs[c]
@@ -128,7 +129,7 @@ def read(bot, update):
         chatlog.add_replyable(update.message.message_id)
 
     replied = update.message.reply_to_message
-    reply_text = update.message.text.casefold()
+    reply_text = update.message.text.casefold() if update.message.text else ""
     to_reply = ((replied is not None) and (replied.from_user.name == "@velascobot")) or ("@velascobot" in reply_text) or ("velasco" in reply_text and "@velasco" not in reply_text)
 
     if to_reply and chatlog.answering(random.random()):
@@ -186,10 +187,10 @@ def speak(bot, update):
     savechat(chatlog)
     chatlogs[chatlog.id] = chatlog
 
-def send_message(bot, update, msg, reply_id):
+def send_message(bot, update, msg, reply_id=None):
     words = msg.split()
     if words[0] == STICKER_TAG:
-        if is_reply:
+        if reply_id is not None:
             update.message.reply_sticker(words[1])
         else:
             bot.sendSticker(update.message.chat_id, words[1])
@@ -310,11 +311,11 @@ def stop(bot, update):
     print("I got blocked by user " + chatlog.id)
 
 def main():
-    global ADMIN_ID
+    global ADMIN_ID, WAKEUP
     parser = argparse.ArgumentParser(description='A Telegram markov bot.')
     parser.add_argument('token', metavar='TOKEN', help='The Bot Token to work with the Telegram Bot API')
     parser.add_argument('admin_id', metavar='ADMIN_ID', type=int, help='The ID of the Telegram user that manages this bot')
-    parser.add_argument('-w', '--wakeup', metavar='WAKEUP_MSG', action='store_true', help='Flag that makes the bot send a first message to all chats during wake up.')
+    parser.add_argument('-w', '--wakeup', action='store_true', help='Flag that makes the bot send a first message to all chats during wake up.')
 
     args = parser.parse_args()
 
