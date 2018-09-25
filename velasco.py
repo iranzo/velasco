@@ -179,11 +179,12 @@ def speak(bot, update):
         if not user_is_admin(user):
             return
 
+    reply_to = update.message.reply_to_message.message_id if update.message.reply_to_message else update.message.message_id
     text = update.message.text.split()
     if len(text) > 1:
         chatlog.add_msg(' '.join(text[1:]))
     msg = chatlog.speak()
-    send_message(bot, update, msg, update.message.message_id)
+    send_message(bot, update, msg, reply_to)
     savechat(chatlog)
     chatlogs[chatlog.id] = chatlog
 
