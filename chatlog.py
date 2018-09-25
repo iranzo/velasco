@@ -59,6 +59,10 @@ class Chatlog(object):
         self.gen.add_text(STICKER_TAG + ' ' + file_id + ' ' + TAIL)
         self.count += 1
 
+    def add_animation(self, file_id):
+        self.gen.add_text(ANIM_TAG + ' ' + file_id + ' ' + TAIL)
+        self.count += 1
+
     def speak(self):
         return self.gen.generate_markov_text()
 

@@ -122,6 +122,8 @@ def read(bot, update):
         chatlog.add_msg(update.message.text)
     elif update.message.sticker is not None:
         chatlog.add_sticker(update.message.sticker.file_id)
+    elif update.message.animation is not None:
+        chatlog.add_animation(update.message.animation.file_id)
 
     if chatlog.get_count()%chatlog.freq == 1:
         chatlog.restart_replyables(update.message.message_id)
@@ -189,16 +191,24 @@ def speak(bot, update):
     chatlogs[chatlog.id] = chatlog
 
 def send_message(bot, update, msg, reply_id=None):
-    words = msg.split()
+    words = msg.split(maxsplit=1)
     if words[0] == STICKER_TAG:
         if reply_id is not None:
             update.message.reply_sticker(words[1])
         else:
             bot.sendSticker(update.message.chat_id, words[1])
-    elif reply_id is not None:
-        bot.sendMessage(update.message.chat.id, msg, reply_to_message_id=reply_id)
+
+    elif words[0] == ANIM_TAG:
+        if reply_id is not None:
+            update.message.reply_animation(words[1])
+        else:
+            bot.sendAnimation(update.message.chat_id, words[1])
+
     else:
-        bot.sendMessage(update.message.chat.id, msg)
+        if reply_id is not None:
+            bot.sendMessage(update.message.chat.id, msg, reply_to_message_id=reply_id)
+        else:
+            bot.sendMessage(update.message.chat.id, msg)
 
 def get_chatlogs(bot, update):
     m = "I have these chatlogs:"

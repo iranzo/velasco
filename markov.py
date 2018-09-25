@@ -6,6 +6,7 @@ import json
 HEAD = "\n^MESSAGE_SEPARATOR^"
 TAIL = "^MESSAGE_SEPARATOR^"
 STICKER_TAG = "^IS_STICKER^"
+ANIM_TAG = "^IS_ANIMATION^"
 
 def trim_and_split(text):
     words = text.replace('\n', '\n ').split(' ')
