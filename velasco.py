@@ -95,7 +95,7 @@ def echo(bot, update):
         update.message.reply_text(text)
 
 def error(bot, update, error):
-    logger.warn('Update "%s" caused error "%s"' % (update, error))
+    logger.warning('Update "%s" caused error "%s"' % (update, error))
 
 def get_chatname(chat):
     if chat.title is not None:
@@ -121,10 +121,15 @@ def read(bot, update):
     if update.message.text is not None:
         chatlog.add_msg(update.message.text)
     elif update.message.sticker is not None:
+        #print("I received a sticker")
         chatlog.add_sticker(update.message.sticker.file_id)
     elif update.message.animation is not None:
+        #print("I received an animation")
         chatlog.add_animation(update.message.animation.file_id)
-
+    elif update.message.video is not None:
+        #print("I received a video")
+        chatlog.add_video(update.message.video.file_id)
+    # print("Read a message of id "update.message.message_id)
     if chatlog.get_count()%chatlog.freq == 1:
         chatlog.restart_replyables(update.message.message_id)
     else:
@@ -203,6 +208,18 @@ def send_message(bot, update, msg, reply_id=None):
             update.message.reply_animation(words[1])
         else:
             bot.sendAnimation(update.message.chat_id, words[1])
+
+    elif words[0] == VIDEO_TAG:
+        if reply_id is not None:
+            try:
+                update.message.reply_animation(words[1])
+            except:
+                update.message.reply_video(words[1])
+        else:
+            try:
+                bot.sendAnimation(update.message.chat_id, words[1])
+            except:
+                bot.sendVideo(update.message.chat_id, words[1])
 
     else:
         if reply_id is not None:
@@ -356,12 +373,16 @@ def main():
 
     # on noncommand i.e message - echo the message on Telegram
     # dp.add_handler(MessageHandler(Filters.text, echo))
-    dp.add_handler(MessageHandler((Filters.text | Filters.sticker), read))
+    dp.add_handler(MessageHandler((Filters.text | Filters.sticker | Filters.animation), read))
 
     # log all errors
     dp.add_error_handler(error)
 
     wake(updater.bot)
+
+    print("-----")
+    print("Finished loading.")
+    print("-----")
 
     # Start the Bot
     updater.start_polling()

@@ -7,6 +7,7 @@ HEAD = "\n^MESSAGE_SEPARATOR^"
 TAIL = "^MESSAGE_SEPARATOR^"
 STICKER_TAG = "^IS_STICKER^"
 ANIM_TAG = "^IS_ANIMATION^"
+VIDEO_TAG = "^IS_VIDEO^"
 
 def trim_and_split(text):
     words = text.replace('\n', '\n ').split(' ')
