@@ -1,146 +1,106 @@
 #!/usr/bin/env python3
 
-import random
-from markov import *
-
-def parse_line(l):
-    s = l.split('=')
+def parse(l):
+    s = l.split('=', 1)
     if len(s) < 2:
         return ""
     else:
         return s[1]
 
 class Chatlog(object):
-    def __init__(self, ident, chattype, title, text=None, freq=None, answer=0.5, restricted=False):
-        self.id = str(ident)
-        self.type = chattype
+    def __init__(self, cid, ctype, title, count=0, freq=None, answer=0.5, restricted=False, silenced=False):
+        self.id = str(cid)
+        self.type = ctype
         self.title = title
         if freq is None:
-            if "group" in chattype:
+            if "group" in ctype:
                 freq = 10
-            #elif chattype is "private":
+            #elif ctype is "private":
             else:
                 freq = 2
+        self.count = count
         self.freq = freq
-        if text is not None:
-            self.count = len(text)
-        else:
-            self.count = 0
-        self.replyables = []
         self.answer = answer
         self.restricted = restricted
-        self.gen = Markov(text)
-
-    def set_title(self, title):
-        self.title = title
-
-    def set_freq(self, freq):
-        if not freq > 0:
-            raise ValueError('Tried to set 0 or negative freq value.')
-        elif freq > 100000:
-            freq = 100000
-        self.freq = freq
-        return self.freq
-
-    def set_answer_freq(self, freq):
-        if freq > 1:
-            self.answer = 1
-        elif freq < 0:
-            self.answer = 0
-        else:
-            self.answer = freq
-        return self.answer
+        self.silenced = silenced
 
     def add_msg(self, message):
-        self.gen.add_text(message + ' ' + TAIL)
+        self.gen.add_text(message)
         self.count += 1
 
-    def add_sticker(self, file_id):
-        self.gen.add_text(STICKER_TAG + ' ' + file_id + ' ' + TAIL)
-        self.count += 1
-
-    def add_video(self, file_id):
-        self.gen.add_text(VIDEO_TAG + ' ' + file_id + ' ' + TAIL)
-        self.count += 1
-
-    def add_animation(self, file_id):
-        self.gen.add_text(ANIM_TAG + ' ' + file_id + ' ' + TAIL)
-        self.count += 1
-
-    def speak(self):
-        return self.gen.generate_markov_text()
-
-    def get_count(self):
-        return self.count
-
-    def answering(self, rand):
-        if self.answer == 1:
-            return True
-        elif self.answer == 0:
-            return False
-        return rand <= self.answer
-
-    def add_replyable(self, msg_id):
-        self.replyables.append(msg_id)
-
-    def restart_replyables(self, msg_id):
-        if msg_id is not None:
-            self.replyables = [msg_id]
+    def set_freq(self, freq):
+        if freq < 1:
+            raise ValueError('Tried to set freq a value less than 1.')
         else:
-            self.replyables = []
+            self.freq = freq
+        return self.freq
 
-    def get_replyable(self):
-        random.choice(self.replyables)
-    def toggle_restrict(self):
-        self.restricted = (not self.restricted)
+    def set_answer(self, afreq):
+        if afreq > 1:
+            raise ValueError('Tried to set answer probability higher than 1.')
+        elif afreq < 0:
+            raise ValueError('Tried to set answer probability lower than 0.')
+        else:
+            self.answer = afreq
+        return self.answer
 
-    def is_restricted(self):
-        return self.restricted
-
-    def to_txt(self):
-        lines = ["DICT=v3"]
+    def dumps(self):
+        lines = ["LOG=v4"]
         lines.append("CHAT_ID=" + self.id)
         lines.append("CHAT_TYPE=" + self.type)
         lines.append("CHAT_NAME=" + self.title)
+        lines.append("WORD_COUNT=" + str(self.count))
         lines.append("MESSAGE_FREQ=" + str(self.freq))
         lines.append("ANSWER_FREQ=" + str(self.answer))
         lines.append("RESTRICTED=" + str(self.restricted))
-        lines.append("WORD_COUNT=" + str(self.count))
-        lines.append("WORD_DICT=")
-        txt = '\n'.join(lines)
-        return txt + '\n' + self.gen.to_json()
+        lines.append("SILENCED=" + str(self.silenced))
+        #lines.append("WORD_DICT=")
+        return '\n'.join(lines)
 
-    def from_txt(text):
+    def loads(text):
         lines = text.splitlines()
-        #print("Line 4=" + lines[4])
-        print("-- Loaded " + parse_line(lines[0]) + ".")
-        if(parse_line(lines[0]) == "v3"):
-            new_log = Chatlog(parse_line(lines[1]), parse_line(lines[2]), parse_line(lines[3]), None, int(parse_line(lines[4])), float(parse_line(lines[5])), (parse_line(lines[6]) == 'True'))
-            new_log.count = int(parse_line(lines[7]))
-            cache = '\n'.join(lines[9:])
-            new_log.gen = Markov.from_json(cache)
-            if new_log.count < 0:
-                new_log.count = new_log.gen.new_count()
-            return new_log
-        elif(parse_line(lines[0]) == "v2"):
-            new_log = Chatlog(parse_line(lines[1]), parse_line(lines[2]), parse_line(lines[3]), None, int(parse_line(lines[4])), float(parse_line(lines[5])))
-            new_log.count = int(parse_line(lines[6]))
-            cache = '\n'.join(lines[8:])
-            new_log.gen = Markov.from_json(cache)
-            if new_log.count < 0:
-                new_log.count = new_log.gen.new_count()
-            return new_log
-        elif(lines[4] == "dict:"):
-            new_log = Chatlog(lines[0], lines[1], lines[2], None, int(lines[3]))
-            new_log.count = int(lines[5])
-            cache = '\n'.join(lines[6:])
-            new_log.gen = Markov.from_json(cache)
-            if new_log.count < 0:
-                new_log.count = new_log.gen.new_count()
-            return new_log
-        else:
-            return Chatlog(lines[0], lines[1], lines[2], lines[4:], int(lines[3]))
+        return Chatlog.loadl(lines)
 
-    def fuse_with(chatlog):
-        self.count += chatlog.count
-        self.gen.fuse_with(chatlog.gen)
+    def loadl(lines):
+        version = parse(lines[0]).strip()
+        version = version if len(version.strip()) > 1 else (lines[4] if len(lines) > 4 else "LOG_ZERO")
+        if version == "v4":
+            return Chatlog(cid=parse(lines[1]),
+                           ctype=parse(lines[2]),
+                           title=parse(lines[3]),
+                           count=int(parse(lines[4])),
+                           freq=int(parse(lines[5])),
+                           answer=float(parse(lines[6])),
+                           restricted=(parse(lines[7]) == 'True'),
+                           silenced=(parse(lines[8]) == 'True')
+                     )
+        elif version == "v3":
+            return Chatlog(cid=parse(lines[1]),
+                           ctype=parse(lines[2]),
+                           title=parse(lines[3]),
+                           count=int(parse(lines[7])),
+                           freq=int(parse(lines[4])),
+                           answer=float(parse(lines[5])),
+                           restricted=(parse(lines[6]) == 'True')
+                      )
+        elif version == "v2":
+            return Chatlog(cid=parse(lines[1]),
+                           ctype=parse(lines[2]),
+                           title=parse(lines[3]),
+                           count=int(parse(lines[6])),
+                           freq=int(parse(lines[4])),
+                           answer=float(parse(lines[5]))
+                      )
+        elif version == "dict:":
+            return Chatlog(cid=lines[0],
+                           ctype=lines[1],
+                           title=lines[2],
+                           count=int(lines[5]),
+                           freq=int(lines[3])
+                      )
+        else:
+            return Chatlog(cid=lines[0],
+                           ctype=lines[1],
+                           title=lines[2],
+                           freq=int(lines[3])
+                      )

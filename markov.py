@@ -3,25 +3,6 @@
 import random
 import json
 
-HEAD = "\n^MESSAGE_SEPARATOR^"
-TAIL = "^MESSAGE_SEPARATOR^"
-STICKER_TAG = "^IS_STICKER^"
-ANIM_TAG = "^IS_ANIMATION^"
-VIDEO_TAG = "^IS_VIDEO^"
-
-def trim_and_split(text):
-    words = text.replace('\n', '\n ').split(' ')
-    i = 0
-    while i < len(words):
-        w = words[i].strip(' \t')
-        if len(w) > 0:
-            words[i] = w
-        else:
-            del words[i]
-            i -= 1
-        i += 1
-    return words
-
 def getkey(w1, w2):
     key = (w1.strip().casefold(), w2.strip().casefold())
     return str(key)
@@ -33,11 +14,9 @@ def getwords(key):
     return words
 
 def triples(wordlist):
-    """ Generates triples from the given data string. So if our string were
-            "What a lovely day", we'd generate (What, a, lovely) and then
-            (a, lovely, day).
-    """
-
+    # Generates triples from the given data string. So if our string were
+    # "What a lovely day", we'd generate (What, a, lovely) and then
+    # (a, lovely, day).
     if len(wordlist) < 3:
         return
 
@@ -45,54 +24,72 @@ def triples(wordlist):
         yield (wordlist[i], wordlist[i+1], wordlist[i+2])
 
 class Markov(object):
-    def __init__(self, text=None, from_json=False):
-        self.cache = {}
-        if not from_json:
-            if text is not None:
-                for line in text:
-                    self.add_text(line)
-        else:
-            self.cache = json.loads(text)
+    ModeJson = "MODE_JSON"
+    ModeList = "MODE_LIST"
+    ModeChatData = "MODE_CHAT_DATA"
 
-    def to_json(self):
+    Head = "\n^MESSAGE_SEPARATOR^"
+    Tail = "^MESSAGE_SEPARATOR^"
+
+    def __init__(self, load=None, mode=None):
+        if mode is not None:
+            if mode == Markov.ModeJson:
+                self.cache = json.loads(load)
+            elif mode == Markov.ModeList:
+                self.cache = {}
+                self.loadList(load)
+        else:
+            self.cache = {}
+
+    def loadList(self, lines):
+        for line in lines:
+            words = [Markov.Head]
+            words.extend(line.split())
+            self.learn_words(words)
+
+    def dumps(self):
         return json.dumps(self.cache)
 
-    def from_json(string):
-        return Markov(string, True)
+    def loads(dump):
+        if len(dump) == 0:
+            return Markov()
+        return Markov(load=dump, mode=Markov.ModeJson)
 
-    def add_text(self, text):
-        words = [HEAD]
-        words.extend(trim_and_split(text))
+    def learn_words(self, words):
         self.database(words)
 
     def database(self, wordlist):
         for w1, w2, w3 in triples(wordlist):
-            if w1 == HEAD:
+            if w1 == Markov.Head:
                 if w1 in self.cache:
-                    self.cache[HEAD].append(w2)
+                    self.cache[Markov.Head].append(w2)
                 else:
-                    self.cache[HEAD] = [w2]
+                    self.cache[Markov.Head] = [w2]
             key = getkey(w1, w2)
             if key in self.cache:
                 self.cache[key].append(w3)
             else:
                 self.cache[key] = [w3]
 
-    def generate_markov_text(self, size=50):
-        w1 = random.choice(self.cache[HEAD])
-        w2 = random.choice(self.cache[getkey(HEAD, w1)])
+    def generate_markov_text(self, size=50, silence=False):
+        if len(self.cache) == 0:
+            return ""
+        w1 = random.choice(self.cache[Markov.Head])
+        w2 = random.choice(self.cache[getkey(Markov.Head, w1)])
         gen_words = []
         for i in range(size):
-            gen_words.append(w1)
-            if w2 == TAIL or not getkey(w1, w2) in self.cache:
+            if silence and w1.startswith("@") and len(w1) > 1:
+                gen_words.append(w1.replace("@", "(@)"))
+            else:
+                gen_words.append(w1)
+            if w2 == Markov.Tail or not getkey(w1, w2) in self.cache:
                 # print("Generated text")
                 break
             else:
                 w1, w2 = w2, random.choice(self.cache[getkey(w1, w2)])
         return ' '.join(gen_words)
 
-    def fuse_with(self, gen):
-        d = gen.cache
+    def cross(self, gen):
         for key in gen.cache:
             if key in self.cache:
                 self.cache[key].extend(d[key])
@@ -103,6 +100,6 @@ class Markov(object):
         count = 0
         for key in self.cache:
             for word in self.cache[key]:
-                if word == MESSAGE_SEPARATOR:
+                if word == Markov.Tail:
                     count += 1
         return count
