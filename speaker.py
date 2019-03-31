@@ -232,7 +232,7 @@ class Speaker(object):
         try:
             answ = float(words[1])
             answ = scribe.setAnswer(answ)
-            update.message.reply_text("Period of speaking set to {}.".format(answ))
+            update.message.reply_text("Answer probability set to {}.".format(answ))
             scribe.store(None)
         except:
             update.message.reply_text("Format was confusing; answer probability unchanged from {}.".format(scribe.answer()))
