@@ -24,26 +24,29 @@ class Archivist(object):
         self.readOnly = readOnly
         self.filterCids = filterCids
         self.bypass = bypass
+        self.scribeFolder = chatdir + "chat_{tag}"
         self.scribePath = chatdir + "chat_{tag}/{file}{ext}"
 
-    def openfile(self, filename, mode):
-        if not os.path.exists(os.path.dirname(filename)):
-            try:
-                os.makedirs(os.path.dirname(filename))
-            except OSError as e:
-                if e.errno != errno.EEXIST:
-                    raise
-        return open(filename, mode)
-
     def store(self, tag, log, gen):
+        scribefolder = self.scribeFolder.format(tag=tag)
+        cardfile = self.scribePath.format(tag=tag, file="card", ext=".txt")
         if self.readOnly:
             return
-        file = self.openfile(self.scribePath.format(tag=tag, file="card", ext=".txt"), 'w')
+        try:
+            if not os.path.exists(scribefolder):
+                os.makedirs(scribefolder, exist_ok=True)
+                self.logger.info("Storing a new chat. Folder {} created.".format(scribefolder))
+        except:
+            self.logger.error("Failed creating {} folder.".format(scribefolder))
+            return
+        file = open(cardfile, 'w')
         file.write(log)
         file.close()
-        file = self.openfile(self.scribePath.format(tag=tag, file="record", ext=self.chatext), 'w')
-        file.write(gen)
-        file.close()
+        if gen is not None:
+            recordfile = self.scribePath.format(tag=tag, file="record", ext=self.chatext)
+            file = open(recordfile, 'w')
+            file.write(gen)
+            file.close()
 
     def recall(self, filename):
         #print("Loading chat: " + path)
@@ -80,8 +83,8 @@ class Archivist(object):
             file.close()
             return Markov.loads(record)
         except:
-            self.logger.error("Parrot file {} not found. Assuming first time parrot.".format(filepath))
-            return Markov()
+            self.logger.error("Parrot file {} not found.".format(filepath))
+            return None
 
     def wakeScriptorium(self):
         scriptorium = {}

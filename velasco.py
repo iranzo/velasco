@@ -83,7 +83,7 @@ def main():
                           chatext=".vls",
                           admin=args.admin_id,
                           filterCids=filterCids,
-                          readOnly=True
+                          readOnly=False
                          )
 
     speakerbot = Speaker("velasco", "@" + username, archivist, logger, wakeup=args.wakeup)

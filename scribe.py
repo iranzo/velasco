@@ -46,9 +46,10 @@ class Scribe(object):
         self.countdown = self.chat.freq
         self.logger = self.archivist.logger
 
-    def FromChat(chat, archivist):
+    def FromChat(chat, archivist, newchat=False):
         chatlog = Chatlog(chat.id, chat.type, getTitle(chat))
-        return Scribe(chatlog, archivist)
+        scribe = Scribe(chatlog, archivist)
+        return scribe
 
     def FromData(data, archivist):
         return None

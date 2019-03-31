@@ -2,6 +2,7 @@
 
 import random
 from scribe import Scribe
+from markov import Markov
 from telegram.error import *
 
 def send(bot, cid, text, replying=None, format=None, logger=None, **kwargs):
@@ -78,7 +79,7 @@ class Speaker(object):
     def getScribe(self, chat):
         cid = str(chat.id)
         if not cid in self.scriptorium:
-            scribe = Scribe.FromChat(chat, self.archivist)
+            scribe = Scribe.FromChat(chat, self.archivist, newchat=True)
             self.scriptorium[cid] = scribe
             return scribe
         else:
@@ -103,6 +104,16 @@ class Speaker(object):
         else:
             scribe.store(self.parrot.dumps())
 
+    def loadParrot(self, scribe):
+        newParrot = False
+        self.parrot = self.archivist.wakeParrot(scribe.cid())
+        if self.parrot is None:
+            newParrot = True
+            self.parrot = Markov()
+        scribe.teachParrot(self.parrot)
+        self.store(scribe)
+        return newParrot
+
     def read(self, bot, update):
         chat = update.message.chat
         scribe = self.getScribe(chat)
@@ -122,9 +133,7 @@ class Speaker(object):
             rid = scribe.getReference() if random.random() <= self.reply else None
             self.say(bot, scribe, replying=rid)
         elif (scribe.freq() - scribe.countdown) % self.archivist.saveCount == 0:
-            self.parrot = self.archivist.wakeParrot(scribe.cid())
-            scribe.teachParrot(self.parrot)
-            self.store(scribe)
+            self.loadParrot(scribe)
 
     def speak(self, bot, update):
         chat = (update.message.chat)
@@ -158,9 +167,7 @@ class Speaker(object):
         if self.filterCids is not None and not scribe.cid() in self.filterCids:
             return
 
-        self.parrot = self.archivist.wakeParrot(scribe.cid())
-        scribe.teachParrot(self.parrot)
-        scribe.store(self.parrot)
+        self.loadParrot(scribe)
         try:
             send(bot, scribe.cid(), self.speech(scribe), replying, logger=self.logger, **kwargs)
             if self.bypass:
@@ -204,7 +211,7 @@ class Speaker(object):
             freq = int(words[1])
             freq = scribe.setFreq(freq)
             update.message.reply_text("Period of speaking set to {}.".format(freq))
-            scribe.store()
+            scribe.store(None)
         except:
             update.message.reply_text("Format was confusing; period unchanged from {}.".format(scribe.freq()))
 
@@ -223,10 +230,10 @@ class Speaker(object):
                 update.message.reply_text("You do not have permissions to do that.")
                 return
         try:
-            afreq = int(words[1])
-            afreq = scribe.setAnswer(afreq)
-            update.message.reply_text("Answer probability set to {}.".format(afreq))
-            scribe.store()
+            answ = float(words[1])
+            answ = scribe.setAnswer(answ)
+            update.message.reply_text("Period of speaking set to {}.".format(answ))
+            scribe.store(None)
         except:
             update.message.reply_text("Format was confusing; answer probability unchanged from {}.".format(scribe.answer()))
 
