@@ -31,3 +31,18 @@ Sending the command on its own tells you the current value. Sending a positive n
 This value is the chance of the bot to answer to a message that is in turn a reply to one of its own messages, or (to be implemented:) to a message that mentions it. The default value is 0.5 (50% chance). The maximum is 1 (100% chance) and to disable it you must set it to 0 (0% chance).
 
 Sending the command on its own tells you the current value. Sending a positive decimal number between 0 and 1 inclusive will set it as the new value.
+
+## File hierarchy
+
+For those who are interested in cloning or forking:
+
+- `velasco.py` is the file in charge of starting up the telegram bot itself
+- `speaker.py` is the file with all the functions for the commands that Velasco has
+- A *Speaker* is then the entity that receives the messages, and has 1 *Parrot* and 1 *Scriptorium*
+- The *Scriptorium* is a collection of *Scribes*. Each *Scribe* contains the metadata of a chat (title, ID number, the `freq`, etc) and the Markov dictionary associated to it
+- *Scribes* are defined in `scribe.py`
+- A *Parrot* is an entity that contains a Markov dictionary, and the *Speaker's Parrot* corresponds to the last chat that prompted a Velasco message. Whenever that happens, the *Parrot* for that chat is loaded, the corresponding *Scribe* teaches the *Parrot* the latest messages, and then the *Scribe* is stored along with the updated dictionary
+- A Markov dictionary is defined in `markov.py`
+- The *Archivist* (defined in `archivist.py`) is in charge of doing all file saves and loads
+
+**Warning:** This hierarchy is pending an overhaul.
