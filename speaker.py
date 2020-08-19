@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import random
-from scribe import Scribe
-from markov import Markov
+
 from telegram.error import *
+
+from markov import Markov
+from scribe import Scribe
+
 
 def send(bot, cid, text, replying=None, format=None, logger=None, **kwargs):
     kwargs["parse_mode"] = format
@@ -27,6 +31,7 @@ def send(bot, cid, text, replying=None, format=None, logger=None, **kwargs):
             logger.info("Sending a {} to {}: '{}'".format(mtype, cid, text))
         return bot.send_message(cid, text, **kwargs)
 
+
 def getTitle(chat):
     if chat.title:
         return chat.title
@@ -39,13 +44,22 @@ def getTitle(chat):
         else:
             return name
 
+
 class Speaker(object):
     ModeFixed = "FIXED_MODE"
     ModeChance = "MODE_CHANCE"
 
-    def __init__(self, name, username, archivist, logger,
-                 reply=0.1, repeat=0.05, wakeup=False, mode=ModeFixed
-                 ):
+    def __init__(
+        self,
+        name,
+        username,
+        archivist,
+        logger,
+        reply=0.1,
+        repeat=0.05,
+        wakeup=False,
+        mode=ModeFixed,
+    ):
         self.name = name
         self.username = username
         self.archivist = archivist
@@ -59,7 +73,7 @@ class Speaker(object):
         self.reply = reply
         self.repeat = repeat
         self.filterCids = archivist.filterCids
-        self.bypass=archivist.bypass
+        self.bypass = archivist.bypass
 
     def announce(self, announcement, check=(lambda _: True)):
         for scribe in self.scriptorium:
@@ -72,13 +86,15 @@ class Speaker(object):
 
     def wake(self, bot, wake):
         if self.wakeup:
+
             def check(scribe):
                 return scribe.checkType("group")
+
             self.announce(wake, check)
 
     def getScribe(self, chat):
         cid = str(chat.id)
-        if not cid in self.scriptorium:
+        if cid not in self.scriptorium:
             scribe = Scribe.FromChat(chat, self.archivist, newchat=True)
             self.scriptorium[cid] = scribe
             return scribe
@@ -93,10 +109,11 @@ class Speaker(object):
                 return False
         replied = message.reply_to_message
         text = message.text.casefold() if message.text else ""
-        return ( ((replied is not None) and (replied.from_user.name == self.username)) or
-                (self.username in text) or
-                (self.name in text and "@{}".format(self.name) not in text)
-                )
+        return (
+            ((replied is not None) and (replied.from_user.name == self.username))
+            or (self.username in text)
+            or (self.name in text and "@{}".format(self.name) not in text)
+        )
 
     def store(self, scribe):
         if self.parrot is None:
@@ -136,7 +153,7 @@ class Speaker(object):
             self.loadParrot(scribe)
 
     def speak(self, bot, update):
-        chat = (update.message.chat)
+        chat = update.message.chat
         scribe = self.getScribe(chat)
 
         if not self.bypass and scribe.isRestricted():
@@ -150,18 +167,26 @@ class Speaker(object):
         rid = replied.message_id if replied else mid
         words = update.message.text.split()
         if len(words) > 1:
-            scribe.learn(' '.join(words[1:]))
+            scribe.learn(" ".join(words[1:]))
         self.say(bot, scribe, replying=rid)
 
     def userIsAdmin(self, member):
-        self.logger.info("user {} ({}) requesting a restricted action".format(str(member.user.id), member.user.name))
+        self.logger.info(
+            "user {} ({}) requesting a restricted action".format(
+                str(member.user.id), member.user.name
+            )
+        )
         # self.logger.info("Bot Creator ID is {}".format(str(self.archivist.admin)))
-        return ((member.status == 'creator') or
-                (member.status == 'administrator') or
-                (member.user.id == self.archivist.admin))
+        return (
+            (member.status == "creator")
+            or (member.status == "administrator")
+            or (member.user.id == self.archivist.admin)
+        )
 
     def speech(self, scribe):
-        return self.parrot.generate_markov_text(size=self.archivist.maxLen, silence=scribe.isSilenced())
+        return self.parrot.generate_markov_text(
+            size=self.archivist.maxLen, silence=scribe.isSilenced()
+        )
 
     def say(self, bot, scribe, replying=None, **kwargs):
         if self.filterCids is not None and not scribe.cid() in self.filterCids:
@@ -169,15 +194,26 @@ class Speaker(object):
 
         self.loadParrot(scribe)
         try:
-            send(bot, scribe.cid(), self.speech(scribe), replying, logger=self.logger, **kwargs)
+            send(
+                bot,
+                scribe.cid(),
+                self.speech(scribe),
+                replying,
+                logger=self.logger,
+                **kwargs
+            )
             if self.bypass:
                 maxFreq = self.archivist.maxFreq
-                scribe.setFreq(random.randint(maxFreq//4, maxFreq))
+                scribe.setFreq(random.randint(maxFreq // 4, maxFreq))
             if random.random() <= self.repeat:
-                send(bot, scribe.cid(), self.speech(scribe), logger=self.logger, **kwargs)
+                send(
+                    bot, scribe.cid(), self.speech(scribe), logger=self.logger, **kwargs
+                )
         except TimedOut:
             scribe.setFreq(scribe.freq() + self.archivist.freqIncrement)
-            self.logger.warning("Increased period for chat {} [{}]".format(scribe.title(), scribe.cid()))
+            self.logger.warning(
+                "Increased period for chat {} [{}]".format(scribe.title(), scribe.cid())
+            )
         except Exception as e:
             self.logger.error("Sending a message caused error:")
             self.logger.error(e)
@@ -189,9 +225,12 @@ class Speaker(object):
         update.message.reply_text("I remember {} messages.".format(num))
 
     def getChats(self, bot, update):
-        lines = ["[{}]: {}".format(cid, self.scriptorium[cid].title()) for cid in self.scriptorium]
+        lines = [
+            "[{}]: {}".format(cid, self.scriptorium[cid].title())
+            for cid in self.scriptorium
+        ]
         list = "\n".join(lines)
-        update.message.reply_text( "\n\n".join(["I have the following chats:", list]) )
+        update.message.reply_text("\n\n".join(["I have the following chats:", list]))
 
     def freq(self, bot, update):
         chat = update.message.chat
@@ -199,7 +238,9 @@ class Speaker(object):
 
         words = update.message.text.split()
         if len(words) <= 1:
-            update.message.reply_text("The current speech period is {}".format(scribe.freq()))
+            update.message.reply_text(
+                "The current speech period is {}".format(scribe.freq())
+            )
             return
 
         if scribe.isRestricted():
@@ -213,7 +254,9 @@ class Speaker(object):
             update.message.reply_text("Period of speaking set to {}.".format(freq))
             scribe.store(None)
         except:
-            update.message.reply_text("Format was confusing; period unchanged from {}.".format(scribe.freq()))
+            update.message.reply_text(
+                "Format was confusing; period unchanged from {}.".format(scribe.freq())
+            )
 
     def answer(self, bot, update):
         chat = update.message.chat
@@ -221,7 +264,9 @@ class Speaker(object):
 
         words = update.message.text.split()
         if len(words) <= 1:
-            update.message.reply_text("The current answer probability is {}".format(scribe.answer()))
+            update.message.reply_text(
+                "The current answer probability is {}".format(scribe.answer())
+            )
             return
 
         if scribe.isRestricted():
@@ -235,7 +280,11 @@ class Speaker(object):
             update.message.reply_text("Answer probability set to {}.".format(answ))
             scribe.store(None)
         except:
-            update.message.reply_text("Format was confusing; answer probability unchanged from {}.".format(scribe.answer()))
+            update.message.reply_text(
+                "Format was confusing; answer probability unchanged from {}.".format(
+                    scribe.answer()
+                )
+            )
 
     def restrict(self, bot, update):
         if "group" not in update.message.chat.type:
@@ -273,12 +322,19 @@ class Speaker(object):
         cht = msg.chat
         chtname = cht.title if cht.title else cht.first_name
 
-        answer = ("You're **{name}**, with username `{username}`, and "
-                  "id `{uid}`.\nYou're messaging in the chat named __{cname}__,"
-                  " of type {ctype}, with id `{cid}`, and timestamp `{tstamp}`."
-                  ).format(name=usr.full_name, username=usr.username,
-                           uid=usr.id, cname=chtname, cid=cht.id,
-                           ctype=scribe.type(), tstamp=str(msg.date))
+        answer = (
+            "You're **{name}**, with username `{username}`, and "
+            "id `{uid}`.\nYou're messaging in the chat named __{cname}__,"
+            " of type {ctype}, with id `{cid}`, and timestamp `{tstamp}`."
+        ).format(
+            name=usr.full_name,
+            username=usr.username,
+            uid=usr.id,
+            cname=chtname,
+            cid=cht.id,
+            ctype=scribe.type(),
+            tstamp=str(msg.date),
+        )
 
         msg.reply_markdown(answer)
 
@@ -296,11 +352,17 @@ class Speaker(object):
         else:
             permissions = "neither restricted nor silenced"
 
-        answer = ("You're messaging in the chat of saved title __{cname}__,"
-                  " with id `{cid}`, message count {c}, period {p}, and answer "
-                  "probability {a}.\n\nThis chat is {perm}."
-                  ).format(cname=scribe.title(), cid=scribe.cid(),
-                           c=scribe.count(), p=scribe.freq(), a=scribe.answer(),
-                           perm=permissions)
+        answer = (
+            "You're messaging in the chat of saved title __{cname}__,"
+            " with id `{cid}`, message count {c}, period {p}, and answer "
+            "probability {a}.\n\nThis chat is {perm}."
+        ).format(
+            cname=scribe.title(),
+            cid=scribe.cid(),
+            c=scribe.count(),
+            p=scribe.freq(),
+            a=scribe.answer(),
+            perm=permissions,
+        )
 
         msg.reply_markdown(answer)

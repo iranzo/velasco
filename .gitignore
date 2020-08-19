@@ -1,3 +1,9 @@
 chatlogs/*
 __pycache__/*
 misc/*
+.idea/
+.token
+.tox/
+.uid
+velasco.log
+.history/

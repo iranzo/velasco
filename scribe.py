@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import random
+
 from chatlog import *
 from markov import Markov
+
 
 def getTitle(chat):
     if chat.title is not None:
@@ -15,11 +18,12 @@ def getTitle(chat):
     else:
         return ""
 
+
 def rewrite(text):
-    words = text.replace('\n', '\n ').split(' ')
+    words = text.replace("\n", "\n ").split(" ")
     i = 0
     while i < len(words):
-        w = words[i].strip(' \t')
+        w = words[i].strip(" \t")
         if len(w) > 0:
             words[i] = w
         else:
@@ -28,10 +32,12 @@ def rewrite(text):
         i += 1
     return words
 
+
 class Page(object):
     def __init__(self, mid, content):
         self.id = mid
         self.content = content
+
 
 class Scribe(object):
     TagPrefix = "^IS_"
@@ -62,28 +68,30 @@ class Scribe(object):
         lines = text.splitlines()
         version = parse(lines[0]).strip()
         version = version if len(version.strip()) > 1 else lines[4]
-        archivist.logger.info( "Dictionary version: {} ({} lines)".format(version, len(lines)) )
+        archivist.logger.info(
+            "Dictionary version: {} ({} lines)".format(version, len(lines))
+        )
         if version == "v4":
             chatlog = Chatlog.loadl(lines[0:9])
-            cache = '\n'.join(lines[10:])
+            cache = "\n".join(lines[10:])
             parrot = Markov.loads(cache)
         elif version == "v3":
             chatlog = Chatlog.loadl(lines[0:8])
-            cache = '\n'.join(lines[9:])
+            cache = "\n".join(lines[9:])
             parrot = Markov.loads(cache)
         elif version == "v2":
             chatlog = Chatlog.loadl(lines[0:7])
-            cache = '\n'.join(lines[8:])
+            cache = "\n".join(lines[8:])
             parrot = Markov.loads(cache)
         elif version == "dict:":
             chatlog = Chatlog.loadl(lines[0:6])
-            cache = '\n'.join(lines[6:])
+            cache = "\n".join(lines[6:])
             parrot = Markov.loads(cache)
         else:
             chatlog = Chatlog.loadl(lines[0:4])
             cache = lines[4:]
             parrot = Markov(load=cache, mode=Markov.ModeList)
-            #raise SyntaxError("Scribe: Chatlog format unrecognized.")
+            # raise SyntaxError("Scribe: Chatlog format unrecognized.")
         s = Scribe(chatlog, archivist)
         s.parrot = parrot
         return s
@@ -130,13 +138,13 @@ class Scribe(object):
         return self.chat.restricted
 
     def restrict(self):
-        self.chat.restricted = (not self.chat.restricted)
+        self.chat.restricted = not self.chat.restricted
 
     def isSilenced(self):
         return self.chat.silenced
 
     def silence(self):
-        self.chat.silenced = (not self.chat.silenced)
+        self.chat.silenced = not self.chat.silenced
 
     def isAnswering(self):
         rand = random.random()
@@ -186,6 +194,7 @@ class Scribe(object):
         for page in self.pages:
             parrot.learn_words(page.content)
         self.pages = []
+
 
 """
     def learnFrom(self, scribe):
