@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 
-def parse(l):
-    s = l.split("=", 1)
+def parse(line):
+    s = line.split("=", 1)
     if len(s) < 2:
         return ""
     else:
