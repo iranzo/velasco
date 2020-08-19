@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-import random
 import json
+import random
+
 
 def getkey(w1, w2):
     key = (w1.strip().casefold(), w2.strip().casefold())
     return str(key)
 
+
 def getwords(key):
-    words = key.strip('()').split(', ')
+    words = key.strip("()").split(", ")
     for i in range(len(words)):
-        words[i].strip('\'')
+        words[i].strip("'")
     return words
+
 
 def triples(wordlist):
     # Generates triples from the given data string. So if our string were
@@ -21,7 +25,8 @@ def triples(wordlist):
         return
 
     for i in range(len(wordlist) - 2):
-        yield (wordlist[i], wordlist[i+1], wordlist[i+2])
+        yield (wordlist[i], wordlist[i + 1], wordlist[i + 2])
+
 
 class Markov(object):
     ModeJson = "MODE_JSON"
@@ -87,7 +92,7 @@ class Markov(object):
                 break
             else:
                 w1, w2 = w2, random.choice(self.cache[getkey(w1, w2)])
-        return ' '.join(gen_words)
+        return " ".join(gen_words)
 
     def cross(self, gen):
         for key in gen.cache:

@@ -1,17 +1,30 @@
+# -*- coding: utf-8 -*-
+import os
+import pickle
+import random
 
-import os, errno, random, pickle
-from scribe import Scribe
 from markov import Markov
+from scribe import Scribe
+
 
 class Archivist(object):
-
-    def __init__(self, logger, chatdir=None, chatext=None, admin=0,
-            freqIncrement=5, saveCount=15, maxFreq=100000, maxLen=50,
-            readOnly=False, filterCids=None, bypass=False
-        ):
+    def __init__(
+        self,
+        logger,
+        chatdir=None,
+        chatext=None,
+        admin=0,
+        freqIncrement=5,
+        saveCount=15,
+        maxFreq=100000,
+        maxLen=50,
+        readOnly=False,
+        filterCids=None,
+        bypass=False,
+    ):
         if chatdir is None or len(chatdir) == 0:
             raise ValueError("Chatlog directory name is empty")
-        elif chatext is None: # Can be len(chatext) == 0
+        elif chatext is None:  # Can be len(chatext) == 0
             raise ValueError("Chatlog file extension is invalid")
         self.logger = logger
         self.chatdir = chatdir
@@ -35,29 +48,33 @@ class Archivist(object):
         try:
             if not os.path.exists(scribefolder):
                 os.makedirs(scribefolder, exist_ok=True)
-                self.logger.info("Storing a new chat. Folder {} created.".format(scribefolder))
+                self.logger.info(
+                    "Storing a new chat. Folder {} created.".format(scribefolder)
+                )
         except:
             self.logger.error("Failed creating {} folder.".format(scribefolder))
             return
-        file = open(cardfile, 'w')
+        file = open(cardfile, "w")
         file.write(log)
         file.close()
         if gen is not None:
-            recordfile = self.scribePath.format(tag=tag, file="record", ext=self.chatext)
-            file = open(recordfile, 'w')
+            recordfile = self.scribePath.format(
+                tag=tag, file="record", ext=self.chatext
+            )
+            file = open(recordfile, "w")
             file.write(gen)
             file.close()
 
     def recall(self, filename):
-        #print("Loading chat: " + path)
-        file = open(self.chatdir + filename, 'rb')
+        # print("Loading chat: " + path)
+        file = open(self.chatdir + filename, "rb")
         scribe = None
         try:
             scribe = Scribe.Recall(pickle.load(file), self)
             self.logger.info("Unpickled {}{}".format(self.chatdir, filename))
         except pickle.UnpicklingError:
             file.close()
-            file = open(self.chatdir + filename, 'r')
+            file = open(self.chatdir + filename, "r")
             try:
                 scribe = Scribe.Recall(file.read(), self)
                 self.logger.info("Read {}{} text file".format(self.chatdir, filename))
@@ -69,7 +86,7 @@ class Archivist(object):
         return scribe
 
     def wakeScribe(self, filepath):
-        file = open(filepath.format(filename="card", ext=".txt"), 'r')
+        file = open(filepath.format(filename="card", ext=".txt"), "r")
         card = file.read()
         file.close()
         return Scribe.FromFile(card, self)
@@ -77,8 +94,8 @@ class Archivist(object):
     def wakeParrot(self, tag):
         filepath = self.scribePath.format(tag=tag, file="record", ext=self.chatext)
         try:
-            file = open(filepath, 'r')
-            #print("\nOPening " + filepath + "\n")
+            file = open(filepath, "r")
+            # print("\nOPening " + filepath + "\n")
             record = file.read()
             file.close()
             return Markov.loads(record)
@@ -97,9 +114,14 @@ class Archivist(object):
                 try:
                     filepath = self.chatdir + dirname + "/{filename}{ext}"
                     scriptorium[cid] = self.wakeScribe(filepath)
-                    self.logger.info("Chat {} contents:\n".format(cid) + scriptorium[cid].chat.dumps())
+                    self.logger.info(
+                        "Chat {} contents:\n".format(cid)
+                        + scriptorium[cid].chat.dumps()
+                    )
                     if self.bypass:
-                        scriptorium[cid].setFreq(random.randint(self.maxFreq//2, self.maxFreq))
+                        scriptorium[cid].setFreq(
+                            random.randint(self.maxFreq // 2, self.maxFreq)
+                        )
                     elif scriptorium[cid].freq() > self.maxFreq:
                         scriptorium[cid].setFreq(self.maxFreq)
                 except Exception as e:
@@ -157,7 +179,9 @@ class Archivist(object):
                             os.remove(filename)
                 except Exception as e:
                     failed.append(filename)
-                    self.logger.error("Found the following error when trying to update:")
+                    self.logger.error(
+                        "Found the following error when trying to update:"
+                    )
                     self.logger.exception(e)
             else:
                 continue
