@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 
 import random
-from scribe import Scribe
-from markov import Markov
+from chatreader import ChatReader as Reader
 from telegram.error import *
 
-def send(bot, cid, text, replying=None, format=None, logger=None, **kwargs):
-    kwargs["parse_mode"] = format
+
+def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
+    kwargs["parse_mode"] = formatting
     kwargs["reply_to_message_id"] = replying
 
-    if text.startswith(Scribe.TagPrefix):
+    if text.startswith(Reader.TAG_PREFIX):
         words = text.split(maxsplit=1)
         if logger:
             logger.info('Sending {} "{}" to {}'.format(words[0][4:-1], words[1], cid))
+            # Logs something like 'Sending VIDEO "VIDEO_ID" to CHAT_ID'
 
-        if words[0] == Scribe.StickerTag:
+        if words[0] == Reader.STICKER_TAG:
             return bot.send_sticker(cid, words[1], **kwargs)
-        elif words[0] == Scribe.AnimTag:
+        elif words[0] == Reader.ANIM_TAG:
             return bot.send_animation(cid, words[1], **kwargs)
-        elif words[0] == Scribe.VideoTag:
+        elif words[0] == Reader.VIDEO_TAG:
             return bot.send_video(cid, words[1], **kwargs)
     else:
         text
@@ -27,17 +28,6 @@ def send(bot, cid, text, replying=None, format=None, logger=None, **kwargs):
             logger.info("Sending a {} to {}: '{}'".format(mtype, cid, text))
         return bot.send_message(cid, text, **kwargs)
 
-def getTitle(chat):
-    if chat.title:
-        return chat.title
-    else:
-        last = chat.last_name if chat.last_name else ""
-        first = chat.first_name if chat.first_name else ""
-        name = " ".join([first, last]).strip()
-        if len(name) == 0:
-            return "Unknown"
-        else:
-            return name
 
 class Speaker(object):
     ModeFixed = "FIXED_MODE"
@@ -59,7 +49,7 @@ class Speaker(object):
         self.reply = reply
         self.repeat = repeat
         self.filterCids = archivist.filterCids
-        self.bypass=archivist.bypass
+        self.bypass = archivist.bypass
 
     def announce(self, announcement, check=(lambda _: True)):
         for scribe in self.scriptorium:
@@ -79,7 +69,7 @@ class Speaker(object):
     def getScribe(self, chat):
         cid = str(chat.id)
         if not cid in self.scriptorium:
-            scribe = Scribe.FromChat(chat, self.archivist, newchat=True)
+            scribe = Reader.FromChat(chat, self.archivist, newchat=True)
             self.scriptorium[cid] = scribe
             return scribe
         else:
