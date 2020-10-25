@@ -2,7 +2,7 @@
 
 def parse_card_line(line):
     # This reads a line in the format 'VARIABLE=value' and gives me the value.
-    # See ChatCard.loadl(...) for more details
+    # See Metadata.loadl(...) for more details
     s = line.split('=', 1)
     if len(s) < 2:
         return ""
@@ -10,7 +10,10 @@ def parse_card_line(line):
         return s[1]
 
 
-class ChatCard(object):
+class Metadata(object):
+    # This is a chat's Metadata, holding different configuration values for
+    # Velasco and other miscellaneous information about the chat
+
     def __init__(self, cid, ctype, title, count=0, period=None, answer=0.5, restricted=False, silenced=False):
         self.id = str(cid)
         # The Telegram chat's ID
@@ -67,7 +70,7 @@ class ChatCard(object):
 
     def loads(text):
         lines = text.splitlines()
-        return ChatCard.loadl(lines)
+        return Metadata.loadl(lines)
 
     def loadl(lines):
         # In a perfect world, I would get both the variable name and its corresponding value
@@ -77,7 +80,7 @@ class ChatCard(object):
         version = parse_card_line(lines[0]).strip()
         version = version if len(version.strip()) > 1 else (lines[4] if len(lines) > 4 else "LOG_ZERO")
         if version == "v4" or version == "v5":
-            return ChatCard(cid=parse_card_line(lines[1]),
+            return Metadata(cid=parse_card_line(lines[1]),
                             ctype=parse_card_line(lines[2]),
                             title=parse_card_line(lines[3]),
                             count=int(parse_card_line(lines[4])),
@@ -87,7 +90,7 @@ class ChatCard(object):
                             silenced=(parse_card_line(lines[8]) == 'True')
                             )
         elif version == "v3":
-            return ChatCard(cid=parse_card_line(lines[1]),
+            return Metadata(cid=parse_card_line(lines[1]),
                             ctype=parse_card_line(lines[2]),
                             title=parse_card_line(lines[3]),
                             count=int(parse_card_line(lines[7])),
@@ -96,7 +99,7 @@ class ChatCard(object):
                             restricted=(parse_card_line(lines[6]) == 'True')
                             )
         elif version == "v2":
-            return ChatCard(cid=parse_card_line(lines[1]),
+            return Metadata(cid=parse_card_line(lines[1]),
                             ctype=parse_card_line(lines[2]),
                             title=parse_card_line(lines[3]),
                             count=int(parse_card_line(lines[6])),
@@ -107,7 +110,7 @@ class ChatCard(object):
             # At some point I decided to number the versions of each dictionary format,
             # but this was not always the case. This is what you get if you try to read
             # whatever there is in very old files where the version should be
-            return ChatCard(cid=lines[0],
+            return Metadata(cid=lines[0],
                             ctype=lines[1],
                             title=lines[2],
                             count=int(lines[5]),
@@ -115,7 +118,7 @@ class ChatCard(object):
                             )
         else:
             # This is for the oldest of files
-            return ChatCard(cid=lines[0],
+            return Metadata(cid=lines[0],
                             ctype=lines[1],
                             title=lines[2],
                             period=int(lines[3])

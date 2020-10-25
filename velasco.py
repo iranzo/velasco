@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-import logging, argparse
+import logging
+import argparse
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-from telegram.error import *
+# from telegram.error import *
 from archivist import Archivist
 from speaker import Speaker
 
@@ -38,7 +39,7 @@ help_msg = """I answer to the following commands:
 /explain - I explain how I work.
 /help - I send this message.
 /count - I tell you how many messages from this chat I remember.
-/freq - Change the frequency of my messages. (Maximum of 100000)
+/period - Change the period of my messages. (Maximum of 100000)
 /speak - Forces me to speak.
 /answer - Change the probability to answer to a reply. (Decimal between 0 and 1).
 /restrict - Toggle restriction of configuration commands to admins only.
@@ -47,7 +48,7 @@ help_msg = """I answer to the following commands:
 
 about_msg = "I am yet another Markov Bot experiment. I read everything you type to me and then spit back nonsensical messages that look like yours.\n\nYou can send /explain if you want further explanation."
 
-explanation = "I decompose every message I read in groups of 3 consecutive words, so for each consecutive pair I save the word that can follow them. I then use this to make my own messages. At first I will only repeat your messages because for each 2 words I will have very few possible following words.\n\nI also separate my vocabulary by chats, so anything I learn in one chat I will only say in that chat. For privacy, you know. Also, I save my vocabulary in the form of a json dictionary, so no logs are kept.\n\nMy default frequency in private chats is one message of mine from each 2 messages received, and in group chats it\'s 10 messages I read for each message I send."
+explanation = "I decompose every message I read in groups of 3 consecutive words, so for each consecutive pair I save the word that can follow them. I then use this to make my own messages. At first I will only repeat your messages because for each 2 words I will have very few possible following words.\n\nI also separate my vocabulary by chats, so anything I learn in one chat I will only say in that chat. For privacy, you know. Also, I save my vocabulary in the form of a json dictionary, so no logs are kept.\n\nMy default period in private chats is one message of mine from each 2 messages received, and in group chats it\'s 10 messages I read for each message I send."
 
 
 def static_reply(text, format=None):
@@ -56,15 +57,16 @@ def static_reply(text, format=None):
     return reply
 
 
-def error(bot, update, error):
-    logger.warning('Update "{}" caused error "{}"'.format(update, error))
+def error(update, context):
+    logger.warning('The following update:\n"{}"\n\nCaused the following error:\n"{}"'.format(update, context.error))
+    # raise error
 
 
 def stop(bot, update):
-    scribe = speakerbot.getScribe(update.message.chat.id)
-    #del chatlogs[chatlog.id]
-    #os.remove(LOG_DIR + chatlog.id + LOG_EXT)
-    logger.warning("I got blocked by user {} [{}]".format(scribe.title(), scribe.cid()))
+    reader = speakerbot.get_reader(str(update.message.chat.id))
+    # del chatlogs[chatlog.id]
+    # os.remove(LOG_DIR + chatlog.id + LOG_EXT)
+    logger.warning("I got blocked by user {} [{}]".format(reader.title(), reader.cid()))
 
 
 def main():
@@ -73,38 +75,42 @@ def main():
     parser.add_argument('token', metavar='TOKEN', help='The Bot Token to work with the Telegram Bot API')
     parser.add_argument('admin_id', metavar='ADMIN_ID', type=int, help='The ID of the Telegram user that manages this bot')
     parser.add_argument('-w', '--wakeup', action='store_true', help='Flag that makes the bot send a first message to all chats during wake up.')
+    parser.add_argument('-f', '--filter', nargs='*', metavar='FILTER_CID', help='Zero or more chat IDs to add in a filter whitelist (default is empty, all chats allowed)')
+    parser.add_argument('-n', '--nicknames', nargs='*', metavar='NICKNAME', help='Any possible nicknames that the bot could answer to.')
 
     args = parser.parse_args()
 
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater(args.token)
+    updater = Updater(args.token, use_context=True)
 
-    #filterCids=["-1001036575277", "-1001040087584", str(args.admin_id)]
-    filterCids = None
+    filter_cids = args.filter
+    if filter_cids:
+        filter_cids.append(str(args.admin_id))
 
     archivist = Archivist(logger,
                           chatdir="chatlogs/",
                           chatext=".vls",
                           admin=args.admin_id,
-                          filterCids=filterCids,
-                          readOnly=False
+                          filter_cids=filter_cids,
+                          read_only=False
                           )
 
-    speakerbot = Speaker("velasco", "@" + username, archivist, logger, wakeup=args.wakeup)
+    username = updater.bot.get_me().username
+    speakerbot = Speaker("@" + username, archivist, logger, nicknames=args.nicknames, wakeup=args.wakeup)
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
     # on different commands - answer in Telegram
-    dp.add_handler(CommandHandler("start", static_reply(start_msg) ))
-    dp.add_handler(CommandHandler("about", static_reply(about_msg) ))
-    dp.add_handler(CommandHandler("explain", static_reply(explanation) ))
-    dp.add_handler(CommandHandler("help", static_reply(help_msg) ))
-    dp.add_handler(CommandHandler("count", speakerbot.getCount))
-    dp.add_handler(CommandHandler("period", speakerbot.freq))
-    dp.add_handler(CommandHandler("list", speakerbot.getChats, Filters.chat(chat_id=archivist.admin)))
-    #dp.add_handler(CommandHandler("user", get_name, Filters.chat(chat_id=archivist.admin)))
-    #dp.add_handler(CommandHandler("id", get_id))
+    dp.add_handler(CommandHandler("start", static_reply(start_msg)))
+    dp.add_handler(CommandHandler("about", static_reply(about_msg)))
+    dp.add_handler(CommandHandler("explain", static_reply(explanation)))
+    dp.add_handler(CommandHandler("help", static_reply(help_msg)))
+    dp.add_handler(CommandHandler("count", speakerbot.get_count))
+    dp.add_handler(CommandHandler("period", speakerbot.period))
+    dp.add_handler(CommandHandler("list", speakerbot.get_chats, filters=Filters.chat(chat_id=archivist.admin)))
+    # dp.add_handler(CommandHandler("user", get_name, Filters.chat(chat_id=archivist.admin)))
+    # dp.add_handler(CommandHandler("id", get_id))
     dp.add_handler(CommandHandler("stop", stop))
     dp.add_handler(CommandHandler("speak", speakerbot.speak))
     dp.add_handler(CommandHandler("answer", speakerbot.answer))
@@ -129,6 +135,7 @@ def main():
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
+
 
 if __name__ == '__main__':
     main()

@@ -59,7 +59,7 @@ class Generator(object):
     # This is to mark when we want to create a Generator object from Chat data (WIP)
 
     HEAD = "\n^MESSAGE_SEPARATOR^"
-    TAIL = "^MESSAGE_SEPARATOR^"
+    TAIL = " ^MESSAGE_SEPARATOR^"
 
     def __init__(self, load=None, mode=None):
         if mode is not None:
@@ -95,9 +95,9 @@ class Generator(object):
         # with the HEAD that marks the beginning of a new message and
         # following it with the TAIL that marks the end
         words = [Generator.HEAD]
-        text = text + " " + Generator.TAIL
-        words.extend(text.split())
-        self.database(rewrite(text))
+        text = rewrite(text + Generator.TAIL)
+        words.extend(text)
+        self.database(words)
 
     def database(self, words):
         # This takes a list of words and stores it in the cache, adding

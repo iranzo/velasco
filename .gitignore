@@ -1,4 +1,5 @@
 chatlogs/*
 __pycache__/*
 misc/*
+bkp/*
 test/*

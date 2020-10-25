@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import random
-from chatreader import ChatReader as Reader
-from telegram.error import *
+from reader import Reader, get_chat_title
+from telegram.error import TimedOut
 
 
 def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
@@ -33,105 +33,117 @@ class Speaker(object):
     ModeFixed = "FIXED_MODE"
     ModeChance = "MODE_CHANCE"
 
-    def __init__(self, name, username, archivist, logger,
+    def __init__(self, username, archivist, logger, nicknames=[],
                  reply=0.1, repeat=0.05, wakeup=False, mode=ModeFixed
                  ):
-        self.name = name
+        self.names = nicknames
         self.username = username
         self.archivist = archivist
-        self.scriptorium = archivist.wakeScriptorium()
         logger.info("----")
         logger.info("Finished loading.")
-        logger.info("Loaded {} chats.".format(len(self.scriptorium)))
+        logger.info("Loaded {} chats.".format(archivist.chat_count()))
         logger.info("----")
         self.wakeup = wakeup
         self.logger = logger
         self.reply = reply
         self.repeat = repeat
-        self.filterCids = archivist.filterCids
+        self.filter_cids = archivist.filter_cids
         self.bypass = archivist.bypass
+        self.current_reader = None
 
-    def announce(self, announcement, check=(lambda _: True)):
-        for scribe in self.scriptorium:
+    def announce(self, bot, announcement, check=(lambda _: True)):
+        # Sends an announcement to all chats that pass the check
+        for reader in self.archivist.readers_pass():
             try:
-                if check(scribe):
-                    send(bot, scribe.cid(), announcement)
-                    logger.info("Waking up on chat {}".format(scribe.cid()))
-            except:
+                if check(reader):
+                    send(bot, reader.cid(), announcement)
+                    self.logger.info("Sending announcement to chat {}".format(reader.cid()))
+            except Exception:
                 pass
 
     def wake(self, bot, wake):
+        # Sends a wake-up message as announcement to all chats that
+        # are groups
         if self.wakeup:
-            def check(scribe):
-                return scribe.checkType("group")
-            self.announce(wake, check)
+            def group_check(reader):
+                return reader.check_type("group")
+            self.announce(bot, wake, group_check)
 
-    def getScribe(self, chat):
+    def load_reader(self, chat):
         cid = str(chat.id)
-        if not cid in self.scriptorium:
-            scribe = Reader.FromChat(chat, self.archivist, newchat=True)
-            self.scriptorium[cid] = scribe
-            return scribe
-        else:
-            return self.scriptorium[cid]
+        if self.current_reader is not None and cid == self.current_reader.cid():
+            return
 
-    def shouldReply(self, message, scribe):
-        if not self.bypass and scribe.isRestricted():
+        if self.current_reader is not None:
+            self.current_reader.commit_memory()
+            self.save()
+
+        reader = self.archivist.get_reader(cid)
+        if not reader:
+            reader = Reader.FromChat(chat, self.archivist.max_period, self.logger)
+        self.current_reader = reader
+
+    def get_reader(self, cid):
+        if self.current_reader is None or cid != self.current_reader.cid():
+            return self.archivist.get_reader(cid)
+
+        return self.current_reader
+
+    def mentioned(self, text):
+        if self.username in text:
+            return True
+        for name in self.names:
+            if name in text and "@{}".format(name) not in text:
+                return True
+        return False
+
+    def should_reply(self, message):
+        if not self.bypass and self.current_reader.is_restricted():
             user = message.chat.get_member(message.from_user.id)
-            if not self.userIsAdmin(user):
+            if not self.user_is_admin(user):
                 # update.message.reply_text("You do not have permissions to do that.")
                 return False
         replied = message.reply_to_message
         text = message.text.casefold() if message.text else ""
-        return ( ((replied is not None) and (replied.from_user.name == self.username)) or
-                (self.username in text) or
-                (self.name in text and "@{}".format(self.name) not in text)
-                )
+        return (((replied is not None) and (replied.from_user.name == self.username))
+                or (self.mentioned(text)))
 
-    def store(self, scribe):
-        if self.parrot is None:
-            raise ValueError("Tried to store a Parrot that is None.")
+    def save(self):
+        if self.current_reader is None:
+            raise ValueError("Tried to store a None Reader.")
         else:
-            scribe.store(self.parrot.dumps())
+            self.archivist.store(*self.current_reader.archive())
 
-    def loadParrot(self, scribe):
-        newParrot = False
-        self.parrot = self.archivist.wakeParrot(scribe.cid())
-        if self.parrot is None:
-            newParrot = True
-            self.parrot = Markov()
-        scribe.teachParrot(self.parrot)
-        self.store(scribe)
-        return newParrot
-
-    def read(self, bot, update):
+    def read(self, update, context):
+        if update.message is None:
+            return
         chat = update.message.chat
-        scribe = self.getScribe(chat)
-        scribe.learn(update.message)
+        self.load_reader(chat)
+        self.current_reader.read(update.message)
 
-        if self.shouldReply(update.message, scribe) and scribe.isAnswering():
-            self.say(bot, scribe, replying=update.message.message_id)
+        if self.should_reply(update.message) and self.current_reader.is_answering():
+            self.say(context.bot, replying=update.message.message_id)
             return
 
-        title = getTitle(update.message.chat)
-        if title != scribe.title():
-            scribe.setTitle(title)
+        title = get_chat_title(update.message.chat)
+        if title != self.current_reader.title():
+            self.current_reader.set_title(title)
 
-        scribe.countdown -= 1
-        if scribe.countdown < 0:
-            scribe.resetCountdown()
-            rid = scribe.getReference() if random.random() <= self.reply else None
-            self.say(bot, scribe, replying=rid)
-        elif (scribe.freq() - scribe.countdown) % self.archivist.saveCount == 0:
-            self.loadParrot(scribe)
+        self.current_reader.countdown -= 1
+        if self.current_reader.countdown < 0:
+            self.current_reader.reset_countdown()
+            rid = self.current_reader.random_memory() if random.random() <= self.reply else None
+            self.say(context.bot, replying=rid)
+        elif (self.current_reader.period() - self.current_reader.countdown) % self.archivist.save_count == 0:
+            self.save()
 
-    def speak(self, bot, update):
+    def speak(self, update, context):
         chat = (update.message.chat)
-        scribe = self.getScribe(chat)
+        self.load_reader(chat)
 
-        if not self.bypass and scribe.isRestricted():
+        if not self.bypass and self.current_reader.is_restricted():
             user = update.message.chat.get_member(update.message.from_user.id)
-            if not self.userIsAdmin(user):
+            if not self.user_is_admin(user):
                 # update.message.reply_text("You do not have permissions to do that.")
                 return
 
@@ -140,148 +152,153 @@ class Speaker(object):
         rid = replied.message_id if replied else mid
         words = update.message.text.split()
         if len(words) > 1:
-            scribe.learn(' '.join(words[1:]))
-        self.say(bot, scribe, replying=rid)
+            self.current_reader.read(' '.join(words[1:]))
+        self.say(context.bot, replying=rid)
 
-    def userIsAdmin(self, member):
+    def user_is_admin(self, member):
         self.logger.info("user {} ({}) requesting a restricted action".format(str(member.user.id), member.user.name))
         # self.logger.info("Bot Creator ID is {}".format(str(self.archivist.admin)))
-        return ((member.status == 'creator') or
-                (member.status == 'administrator') or
-                (member.user.id == self.archivist.admin))
+        return ((member.status == 'creator')
+                or (member.status == 'administrator')
+                or (member.user.id == self.archivist.admin))
 
-    def speech(self, scribe):
-        return self.parrot.generate_markov_text(size=self.archivist.maxLen, silence=scribe.isSilenced())
+    def speech(self):
+        return self.current_reader.generate_message(self.archivist.max_len)
 
-    def say(self, bot, scribe, replying=None, **kwargs):
-        if self.filterCids is not None and not scribe.cid() in self.filterCids:
+    def say(self, bot, replying=None, **kwargs):
+        cid = self.current_reader.cid()
+        if self.filter_cids is not None and cid not in self.filter_cids:
             return
 
-        self.loadParrot(scribe)
         try:
-            send(bot, scribe.cid(), self.speech(scribe), replying, logger=self.logger, **kwargs)
+            send(bot, cid, self.speech(), replying, logger=self.logger, **kwargs)
             if self.bypass:
-                maxFreq = self.archivist.maxFreq
-                scribe.setFreq(random.randint(maxFreq//4, maxFreq))
+                max_period = self.archivist.max_period
+                self.current_reader.set_period(random.randint(max_period // 4, max_period))
             if random.random() <= self.repeat:
-                send(bot, scribe.cid(), self.speech(scribe), logger=self.logger, **kwargs)
+                send(bot, cid, self.speech(), logger=self.logger, **kwargs)
         except TimedOut:
-            scribe.setFreq(scribe.freq() + self.archivist.freqIncrement)
-            self.logger.warning("Increased period for chat {} [{}]".format(scribe.title(), scribe.cid()))
+            self.current_reader.set_period(self.current_reader.period() + self.archivist.period_inc)
+            self.logger.warning("Increased period for chat {} [{}]".format(self.current_reader.title(), cid))
         except Exception as e:
             self.logger.error("Sending a message caused error:")
-            self.logger.error(e)
+            raise e
 
-    def getCount(self, bot, update):
+    def get_count(self, update, context):
         cid = str(update.message.chat.id)
-        scribe = self.scriptorium[cid]
-        num = str(scribe.count()) if self.scriptorium[cid] else "no"
+        reader = self.get_reader(cid)
+
+        num = str(reader.count()) if reader else "no"
         update.message.reply_text("I remember {} messages.".format(num))
 
-    def getChats(self, bot, update):
-        lines = ["[{}]: {}".format(cid, self.scriptorium[cid].title()) for cid in self.scriptorium]
-        list = "\n".join(lines)
-        update.message.reply_text( "\n\n".join(["I have the following chats:", list]) )
+    def get_chats(self, update, context):
+        lines = ["[{}]: {}".format(reader.cid(), reader.title()) for reader in self.archivist.readers_pass]
+        chat_list = "\n".join(lines)
+        update.message.reply_text("I have the following chats:\n\n" + chat_list)
 
-    def freq(self, bot, update):
+    def period(self, update, context):
         chat = update.message.chat
-        scribe = self.getScribe(chat)
+        reader = self.get_reader(str(chat.id))
 
         words = update.message.text.split()
         if len(words) <= 1:
-            update.message.reply_text("The current speech period is {}".format(scribe.freq()))
+            update.message.reply_text("The current speech period is {}".format(reader.period()))
             return
 
-        if scribe.isRestricted():
+        if reader.is_restricted():
             user = update.message.chat.get_member(update.message.from_user.id)
-            if not self.userIsAdmin(user):
+            if not self.user_is_admin(user):
                 update.message.reply_text("You do not have permissions to do that.")
                 return
         try:
-            freq = int(words[1])
-            freq = scribe.setFreq(freq)
-            update.message.reply_text("Period of speaking set to {}.".format(freq))
-            scribe.store(None)
-        except:
-            update.message.reply_text("Format was confusing; period unchanged from {}.".format(scribe.freq()))
+            period = int(words[1])
+            period = reader.set_period(period)
+            update.message.reply_text("Period of speaking set to {}.".format(period))
+            self.archivist.store(*reader.archive())
+        except Exception:
+            update.message.reply_text("Format was confusing; period unchanged from {}.".format(reader.period()))
 
-    def answer(self, bot, update):
+    def answer(self, update, context):
         chat = update.message.chat
-        scribe = self.getScribe(chat)
+        reader = self.get_reader(str(chat.id))
 
         words = update.message.text.split()
         if len(words) <= 1:
-            update.message.reply_text("The current answer probability is {}".format(scribe.answer()))
+            update.message.reply_text("The current answer probability is {}".format(reader.answer()))
             return
 
-        if scribe.isRestricted():
+        if reader.is_restricted():
             user = update.message.chat.get_member(update.message.from_user.id)
-            if not self.userIsAdmin(user):
+            if not self.user_is_admin(user):
                 update.message.reply_text("You do not have permissions to do that.")
                 return
         try:
-            answ = float(words[1])
-            answ = scribe.setAnswer(answ)
-            update.message.reply_text("Answer probability set to {}.".format(answ))
-            scribe.store(None)
-        except:
-            update.message.reply_text("Format was confusing; answer probability unchanged from {}.".format(scribe.answer()))
+            answer = float(words[1])
+            answer = reader.set_answer(answer)
+            update.message.reply_text("Answer probability set to {}.".format(answer))
+            self.archivist.store(*reader.archive())
+        except Exception:
+            update.message.reply_text("Format was confusing; answer probability unchanged from {}.".format(reader.answer()))
 
-    def restrict(self, bot, update):
+    def restrict(self, update, context):
         if "group" not in update.message.chat.type:
             update.message.reply_text("That only works in groups.")
             return
         chat = update.message.chat
         user = chat.get_member(update.message.from_user.id)
-        scribe = self.getScribe(chat)
-        if scribe.isRestricted():
-            if not self.userIsAdmin(user):
+        reader = self.get_reader(str(chat.id))
+
+        if reader.is_restricted():
+            if not self.user_is_admin(user):
                 update.message.reply_text("You do not have permissions to do that.")
                 return
-        scribe.restrict()
-        allowed = "let only admins" if scribe.isRestricted() else "let everyone"
+        reader.toggle_restrict()
+        allowed = "let only admins" if reader.is_restricted() else "let everyone"
         update.message.reply_text("I will {} configure me now.".format(allowed))
+        self.archivist.store(*reader.archive())
 
-    def silence(self, bot, update):
+    def silence(self, update, context):
         if "group" not in update.message.chat.type:
             update.message.reply_text("That only works in groups.")
             return
         chat = update.message.chat
         user = chat.get_member(update.message.from_user.id)
-        scribe = self.getScribe(chat)
-        if scribe.isRestricted():
-            if not self.userIsAdmin(user):
+        reader = self.get_reader(str(chat.id))
+
+        if reader.is_restricted():
+            if not self.user_is_admin(user):
                 update.message.reply_text("You do not have permissions to do that.")
                 return
-        scribe.silence()
-        allowed = "avoid mentioning" if scribe.isSilenced() else "mention"
+        reader.toggle_silence()
+        allowed = "avoid mentioning" if reader.is_silenced() else "mention"
         update.message.reply_text("I will {} people now.".format(allowed))
+        self.archivist.store(*reader.archive())
 
-    def who(self, bot, update):
+    def who(self, update, context):
         msg = update.message
         usr = msg.from_user
         cht = msg.chat
         chtname = cht.title if cht.title else cht.first_name
+        rdr = self.get_reader(str(cht.id))
 
         answer = ("You're **{name}**, with username `{username}`, and "
                   "id `{uid}`.\nYou're messaging in the chat named __{cname}__,"
                   " of type {ctype}, with id `{cid}`, and timestamp `{tstamp}`."
                   ).format(name=usr.full_name, username=usr.username,
                            uid=usr.id, cname=chtname, cid=cht.id,
-                           ctype=scribe.type(), tstamp=str(msg.date))
+                           ctype=rdr.ctype(), tstamp=str(msg.date))
 
         msg.reply_markdown(answer)
 
-    def where(self, bot, update):
-        print("THEY'RE ASKING WHERE")
+    def where(self, update, context):
         msg = update.message
         chat = msg.chat
-        scribe = self.getScribe(chat)
-        if scribe.isRestricted() and scribe.isSilenced():
+        reader = self.get_reader(str(chat.id))
+        if reader.is_restricted() and reader.is_silenced():
             permissions = "restricted and silenced"
-        elif scribe.isRestricted():
+        elif reader.is_restricted():
             permissions = "restricted but not silenced"
-        elif scribe.isSilenced():
+        elif reader.is_silenced():
             permissions = "not restricted but silenced"
         else:
             permissions = "neither restricted nor silenced"
@@ -289,8 +306,8 @@ class Speaker(object):
         answer = ("You're messaging in the chat of saved title __{cname}__,"
                   " with id `{cid}`, message count {c}, period {p}, and answer "
                   "probability {a}.\n\nThis chat is {perm}."
-                  ).format(cname=scribe.title(), cid=scribe.cid(),
-                           c=scribe.count(), p=scribe.freq(), a=scribe.answer(),
-                           perm=permissions)
+                  ).format(cname=reader.title(), cid=reader.cid(),
+                           c=reader.count(), p=reader.period(),
+                           a=reader.answer(), perm=permissions)
 
         msg.reply_markdown(answer)
