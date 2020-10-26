@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 import random
+import time
 from reader import Reader, get_chat_title
-from telegram.error import TimedOut
+from telegram.error import TimedOut, NetworkError
 
 
 def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
@@ -33,10 +34,11 @@ class Speaker(object):
     ModeFixed = "FIXED_MODE"
     ModeChance = "MODE_CHANCE"
 
-    def __init__(self, username, archivist, logger, nicknames=[],
+    def __init__(self, username, archivist, logger, nicknames=[], mute_time=60,
                  reply=0.1, repeat=0.05, wakeup=False, mode=ModeFixed
                  ):
         self.names = nicknames
+        self.mute_time = mute_time
         self.username = username
         self.archivist = archivist
         logger.info("----")
@@ -50,6 +52,7 @@ class Speaker(object):
         self.filter_cids = archivist.filter_cids
         self.bypass = archivist.bypass
         self.current_reader = None
+        self.time_counter = None
 
     def announce(self, bot, announcement, check=(lambda _: True)):
         # Sends an announcement to all chats that pass the check
@@ -100,6 +103,9 @@ class Speaker(object):
         return False
 
     def should_reply(self, message):
+        current_time = int(time.perf_counter())
+        if self.time_counter is not None and (current_time - self.time_counter) < self.mute_time:
+            return False
         if not self.bypass and self.current_reader.is_restricted():
             user = message.chat.get_member(message.from_user.id)
             if not self.user_is_admin(user):
@@ -179,12 +185,19 @@ class Speaker(object):
                 self.current_reader.set_period(random.randint(max_period // 4, max_period))
             if random.random() <= self.repeat:
                 send(bot, cid, self.speech(), logger=self.logger, **kwargs)
-        except TimedOut:
-            self.current_reader.set_period(self.current_reader.period() + self.archivist.period_inc)
-            self.logger.warning("Increased period for chat {} [{}]".format(self.current_reader.title(), cid))
+        except TimedOut as e:
+            self.logger.error("Telegram timed out.")
+            self.logger.exception(e)
+        except NetworkError as e:
+            if '429' in e.message:
+                self.logger.error("Error: TooManyRequests. Going mute for {} seconds.".format(self.mute_time))
+                self.time_counter = int(time.perf_counter())
+            else:
+                self.logger.error("Sending a message caused network error:")
+                self.logger.exception(e)
         except Exception as e:
-            self.logger.error("Sending a message caused error:")
-            raise e
+            self.logger.error("Sending a message caused exception:")
+            self.logger.exception(e)
 
     def get_count(self, update, context):
         cid = str(update.message.chat.id)

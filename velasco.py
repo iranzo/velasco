@@ -58,7 +58,8 @@ def static_reply(text, format=None):
 
 
 def error(update, context):
-    logger.warning('The following update:\n"{}"\n\nCaused the following error:\n"{}"'.format(update, context.error))
+    logger.warning('The following update:\n"{}"\n\nCaused the following error:\n'.format(update))
+    logger.exception(context.error)
     # raise error
 
 
