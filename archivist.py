@@ -58,6 +58,18 @@ class Archivist(object):
     def load_vocab(self, tag):
         filepath = self.chat_file(tag=tag, file="record", ext=self.chatext)
         try:
+            file = open(filepath, 'r', encoding="utf-16")
+            record = file.read()
+            file.close()
+            return record
+        except Exception as e:
+            self.logger.error("Vocabulary file {} not found.".format(filepath))
+            self.logger.exception(e)
+            return None
+
+    def load_vocab_old(self, tag):
+        filepath = self.chat_file(tag=tag, file="record", ext=self.chatext)
+        try:
             file = open(filepath, 'r')
             record = file.read().encode().decode('utf-8')
             file.close()
@@ -90,25 +102,6 @@ class Archivist(object):
         else:
             return None
 
-    def load_reader_old(self, filename):
-        file = open(self.chatdir + filename, 'rb')
-        reader = None
-        try:
-            reader, vocab = Reader.FromFile(pickle.load(file), self)
-            self.logger.info("Unpickled {}{}".format(self.chatdir, filename))
-        except pickle.UnpicklingError:
-            file.close()
-            file = open(self.chatdir + filename, 'r')
-            try:
-                scribe = Reader.FromFile(file.read(), self)
-                self.logger.info("Read {}{} text file".format(self.chatdir, filename))
-            except Exception as e:
-                self.logger.error("Failed reading {}{}".format(self.chatdir, filename))
-                self.logger.exception(e)
-                raise e
-        file.close()
-        return scribe
-
     def chat_count(self):
         count = 0
         directory = os.fsencode(self.chatdir)
@@ -139,11 +132,13 @@ class Archivist(object):
                     self.logger.exception(e)
                     raise e
 
-    def update(self, oldext=None):
+    def update(self):
         for reader in self.readers_pass():
-            try:
-                self.store(*reader.archive())
-            except Exception as e:
-                e.message = e.message[:1000]
-                self.logger.exception(e)
+            if reader.vocab is None:
                 yield reader.cid()
+            else:
+                try:
+                    self.store(*reader.archive())
+                except Exception as e:
+                    self.logger.exception(e)
+                    yield reader.cid()
