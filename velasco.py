@@ -52,7 +52,7 @@ explanation = "I decompose every message I read in groups of 3 consecutive words
 
 
 def static_reply(text, format=None):
-    def reply(bot, update):
+    def reply(update, context):
         update.message.reply_text(text, parse_mode=format)
     return reply
 
@@ -63,7 +63,7 @@ def error(update, context):
     # raise error
 
 
-def stop(bot, update):
+def stop(update, context):
     reader = speakerbot.get_reader(str(update.message.chat.id))
     # del chatlogs[chatlog.id]
     # os.remove(LOG_DIR + chatlog.id + LOG_EXT)

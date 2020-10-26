@@ -1,5 +1,5 @@
 
-import os, random, pickle
+import os, random
 from reader import Reader
 from generator import Generator
 
