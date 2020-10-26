@@ -124,16 +124,17 @@ class Archivist(object):
             if dirname.startswith("chat_"):
                 cid = dirname[5:]
                 try:
-                    reader = self.load_reader(cid)
+                    reader = self.get_reader(cid)
                     # self.logger.info("Chat {} contents:\n{}".format(cid, reader.card.dumps()))
-                    self.logger.info("Successfully read {} ({}) chat.\n".format(cid, reader.title()))
+                    self.logger.info("Successfully passed through {} ({}) chat.\n".format(cid, reader.title()))
                     if self.bypass:  # I forgot what I made this for
                         reader.set_period(random.randint(self.max_period // 2, self.max_period))
                     elif reader.period() > self.max_period:
                         reader.set_period(self.max_period)
+                    self.store(*reader.archive())
                     yield reader
                 except Exception as e:
-                    self.logger.error("Failed reading {}".format(dirname))
+                    self.logger.error("Failed passing through {}".format(dirname))
                     self.logger.exception(e)
                     raise e
 
