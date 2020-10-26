@@ -62,8 +62,10 @@ class Speaker(object):
                 pass
 
     def wake(self, bot, wake):
-        # Sends a wake-up message as announcement to all chats that
-        # are groups
+        # If wakeup flag is set, sends a wake-up message as announcement to all chats that
+        # are groups. Also, always sends a wakeup message to the 'bot admin'
+        send(bot, self.archivist.admin, wake)
+
         if self.wakeup:
             def group_check(reader):
                 return reader.check_type("group")
