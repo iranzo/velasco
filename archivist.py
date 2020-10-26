@@ -51,7 +51,7 @@ class Archivist(object):
 
         if gen is not None:
             chat_record = self.chat_file(tag=tag, file="record", ext=self.chatext)
-            file = open(chat_record, 'w')
+            file = open(chat_record, 'w', encoding="utf-16")
             file.write(gen)
             file.close()
 
@@ -59,11 +59,12 @@ class Archivist(object):
         filepath = self.chat_file(tag=tag, file="record", ext=self.chatext)
         try:
             file = open(filepath, 'r')
-            record = file.read()
+            record = file.read().encode().decode('utf-8')
             file.close()
             return record
-        except Exception:
+        except Exception as e:
             self.logger.error("Vocabulary file {} not found.".format(filepath))
+            self.logger.exception(e)
             return None
 
     def load_reader(self, tag):
@@ -139,29 +140,10 @@ class Archivist(object):
                     raise e
 
     def update(self, oldext=None):
-        failed = []
-        remove = False
-        if not oldext:
-            oldext = self.chatext
-            remove = True
-
-        directory = os.fsencode(self.chatdir)
-        for file in os.listdir(directory):
-            filename = os.fsdecode(file)
-            if filename.endswith(oldext):
-                try:
-                    self.logger.info("Updating chat " + filename)
-                    scribe = self.recall(filename)
-                    if scribe is not None:
-                        scribe.store(scribe.parrot.dumps())
-                        self.wakeParrot(scribe.cid())
-                        self.logger.info("--- Update done: " + scribe.title())
-                        if remove:
-                            os.remove(filename)
-                except Exception as e:
-                    failed.append(filename)
-                    self.logger.error("Found the following error when trying to update:")
-                    self.logger.exception(e)
-            else:
-                continue
-        return failed
+        for reader in self.readers_pass():
+            try:
+                self.store(*reader.archive())
+            except Exception as e:
+                e.message = e.message[:1000]
+                self.logger.exception(e)
+                yield reader.cid()

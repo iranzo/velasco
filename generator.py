@@ -80,7 +80,7 @@ class Generator(object):
 
     def dumps(self):
         # Dumps the cache dictionary into a JSON-formatted string
-        return json.dumps(self.cache)
+        return json.dumps(self.cache, ensure_ascii=False)
 
     def loads(dump):
         # Loads the cache dictionary from a JSON-formatted string
