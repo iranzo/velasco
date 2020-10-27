@@ -2,8 +2,13 @@
 
 import random
 import time
+from memorylist import MemoryList
 from reader import Reader, get_chat_title
 from telegram.error import TimedOut, NetworkError
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
 def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
@@ -13,7 +18,8 @@ def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
     if text.startswith(Reader.TAG_PREFIX):
         words = text.split(maxsplit=1)
         if logger:
-            logger.info('Sending {} "{}" to {}'.format(words[0][4:-1], words[1], cid))
+            # logger.info('Sending {} "{}" to {}'.format(words[0][4:-1], words[1], cid))
+            eprint('.')
             # Logs something like 'Sending VIDEO "VIDEO_ID" to CHAT_ID'
 
         if words[0] == Reader.STICKER_TAG:
@@ -35,7 +41,8 @@ class Speaker(object):
     ModeChance = "MODE_CHANCE"
 
     def __init__(self, username, archivist, logger, nicknames=[], mute_time=60,
-                 reply=0.1, repeat=0.05, wakeup=False, mode=ModeFixed
+                 reply=0.1, repeat=0.05, wakeup=False, mode=ModeFixed,
+                 memory=20
                  ):
         self.names = nicknames
         self.mute_time = mute_time
@@ -51,8 +58,8 @@ class Speaker(object):
         self.repeat = repeat
         self.filter_cids = archivist.filter_cids
         self.bypass = archivist.bypass
-        self.current_reader = None
         self.time_counter = None
+        self.memory = MemoryList(memory)
 
     def announce(self, bot, announcement, check=(lambda _: True)):
         # Sends an announcement to all chats that pass the check
@@ -74,25 +81,31 @@ class Speaker(object):
                 return reader.check_type("group")
             self.announce(bot, wake, group_check)
 
+    def get_reader(self, cid):
+        return self.memory.get_next(lambda r: r.cid() == cid)
+
     def load_reader(self, chat):
         cid = str(chat.id)
-        if self.current_reader is not None and cid == self.current_reader.cid():
-            return
-
-        if self.current_reader is not None:
-            self.current_reader.commit_memory()
-            self.save()
+        reader = self.get_reader(cid)
+        if reader is not None:
+            return reader
 
         reader = self.archivist.get_reader(cid)
         if not reader:
             reader = Reader.FromChat(chat, self.archivist.max_period, self.logger)
-        self.current_reader = reader
 
-    def get_reader(self, cid):
-        if self.current_reader is None or cid != self.current_reader.cid():
+        old_reader = self.memory.append(reader)
+        if old_reader is not None:
+            old_reader.commit_memory()
+            self.store(old_reader)
+
+        return reader
+
+    def access_reader(self, cid):
+        reader = self.get_reader(cid)
+        if reader is None:
             return self.archivist.get_reader(cid)
-
-        return self.current_reader
+        return reader
 
     def mentioned(self, text):
         if self.username in text:
@@ -102,11 +115,14 @@ class Speaker(object):
                 return True
         return False
 
-    def should_reply(self, message):
+    def is_mute(self):
         current_time = int(time.perf_counter())
-        if self.time_counter is not None and (current_time - self.time_counter) < self.mute_time:
+        return self.time_counter is not None and (current_time - self.time_counter) < self.mute_time
+
+    def should_reply(self, message, reader):
+        if self.is_mute():
             return False
-        if not self.bypass and self.current_reader.is_restricted():
+        if not self.bypass and reader.is_restricted():
             user = message.chat.get_member(message.from_user.id)
             if not self.user_is_admin(user):
                 # update.message.reply_text("You do not have permissions to do that.")
@@ -116,40 +132,38 @@ class Speaker(object):
         return (((replied is not None) and (replied.from_user.name == self.username))
                 or (self.mentioned(text)))
 
-    def save(self):
-        if self.current_reader is None:
+    def store(self, reader):
+        if reader is None:
             raise ValueError("Tried to store a None Reader.")
         else:
-            self.archivist.store(*self.current_reader.archive())
+            self.archivist.store(*reader.archive())
 
     def read(self, update, context):
         if update.message is None:
             return
         chat = update.message.chat
-        self.load_reader(chat)
-        self.current_reader.read(update.message)
+        reader = self.load_reader(chat)
+        reader.read(update.message)
 
-        if self.should_reply(update.message) and self.current_reader.is_answering():
-            self.say(context.bot, replying=update.message.message_id)
+        if self.should_reply(update.message, reader) and reader.is_answering():
+            self.say(context.bot, reader, replying=update.message.message_id)
             return
 
         title = get_chat_title(update.message.chat)
-        if title != self.current_reader.title():
-            self.current_reader.set_title(title)
+        if title != reader.title():
+            reader.set_title(title)
 
-        self.current_reader.countdown -= 1
-        if self.current_reader.countdown < 0:
-            self.current_reader.reset_countdown()
-            rid = self.current_reader.random_memory() if random.random() <= self.reply else None
-            self.say(context.bot, replying=rid)
-        elif (self.current_reader.period() - self.current_reader.countdown) % self.archivist.save_count == 0:
-            self.save()
+        reader.countdown -= 1
+        if reader.countdown < 0:
+            reader.reset_countdown()
+            rid = reader.random_memory() if random.random() <= self.reply else None
+            self.say(context.bot, reader, replying=rid)
 
     def speak(self, update, context):
         chat = (update.message.chat)
-        self.load_reader(chat)
+        reader = self.load_reader(chat)
 
-        if not self.bypass and self.current_reader.is_restricted():
+        if not self.bypass and reader.is_restricted():
             user = update.message.chat.get_member(update.message.from_user.id)
             if not self.user_is_admin(user):
                 # update.message.reply_text("You do not have permissions to do that.")
@@ -160,31 +174,33 @@ class Speaker(object):
         rid = replied.message_id if replied else mid
         words = update.message.text.split()
         if len(words) > 1:
-            self.current_reader.read(' '.join(words[1:]))
-        self.say(context.bot, replying=rid)
+            reader.read(' '.join(words[1:]))
+        self.say(context.bot, reader, replying=rid)
 
     def user_is_admin(self, member):
-        self.logger.info("user {} ({}) requesting a restricted action".format(str(member.user.id), member.user.name))
+        # self.logger.info("user {} ({}) requesting a restricted action".format(str(member.user.id), member.user.name))
         # self.logger.info("Bot Creator ID is {}".format(str(self.archivist.admin)))
         return ((member.status == 'creator')
                 or (member.status == 'administrator')
                 or (member.user.id == self.archivist.admin))
 
-    def speech(self):
-        return self.current_reader.generate_message(self.archivist.max_len)
+    def speech(self, reader):
+        return reader.generate_message(self.archivist.max_len)
 
-    def say(self, bot, replying=None, **kwargs):
-        cid = self.current_reader.cid()
+    def say(self, bot, reader, replying=None, **kwargs):
+        cid = reader.cid()
         if self.filter_cids is not None and cid not in self.filter_cids:
+            return
+        if self.is_mute():
             return
 
         try:
-            send(bot, cid, self.speech(), replying, logger=self.logger, **kwargs)
+            send(bot, cid, self.speech(reader), replying, logger=self.logger, **kwargs)
             if self.bypass:
                 max_period = self.archivist.max_period
-                self.current_reader.set_period(random.randint(max_period // 4, max_period))
+                reader.set_period(random.randint(max_period // 4, max_period))
             if random.random() <= self.repeat:
-                send(bot, cid, self.speech(), logger=self.logger, **kwargs)
+                send(bot, cid, self.speech(reader), logger=self.logger, **kwargs)
         except TimedOut as e:
             self.logger.error("Telegram timed out.")
             self.logger.exception(e)
@@ -201,7 +217,7 @@ class Speaker(object):
 
     def get_count(self, update, context):
         cid = str(update.message.chat.id)
-        reader = self.get_reader(cid)
+        reader = self.access_reader(cid)
 
         num = str(reader.count()) if reader else "no"
         update.message.reply_text("I remember {} messages.".format(num))
@@ -213,7 +229,7 @@ class Speaker(object):
 
     def period(self, update, context):
         chat = update.message.chat
-        reader = self.get_reader(str(chat.id))
+        reader = self.access_reader(str(chat.id))
 
         words = update.message.text.split()
         if len(words) <= 1:
@@ -235,7 +251,7 @@ class Speaker(object):
 
     def answer(self, update, context):
         chat = update.message.chat
-        reader = self.get_reader(str(chat.id))
+        reader = self.access_reader(str(chat.id))
 
         words = update.message.text.split()
         if len(words) <= 1:
@@ -261,7 +277,7 @@ class Speaker(object):
             return
         chat = update.message.chat
         user = chat.get_member(update.message.from_user.id)
-        reader = self.get_reader(str(chat.id))
+        reader = self.access_reader(str(chat.id))
 
         if reader.is_restricted():
             if not self.user_is_admin(user):
@@ -278,7 +294,7 @@ class Speaker(object):
             return
         chat = update.message.chat
         user = chat.get_member(update.message.from_user.id)
-        reader = self.get_reader(str(chat.id))
+        reader = self.access_reader(str(chat.id))
 
         if reader.is_restricted():
             if not self.user_is_admin(user):
@@ -294,7 +310,7 @@ class Speaker(object):
         usr = msg.from_user
         cht = msg.chat
         chtname = cht.title if cht.title else cht.first_name
-        rdr = self.get_reader(str(cht.id))
+        rdr = self.access_reader(str(cht.id))
 
         answer = ("You're **{name}**, with username `{username}`, and "
                   "id `{uid}`.\nYou're messaging in the chat named __{cname}__,"
@@ -308,7 +324,7 @@ class Speaker(object):
     def where(self, update, context):
         msg = update.message
         chat = msg.chat
-        reader = self.get_reader(str(chat.id))
+        reader = self.access_reader(str(chat.id))
         if reader.is_restricted() and reader.is_silenced():
             permissions = "restricted and silenced"
         elif reader.is_restricted():

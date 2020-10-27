@@ -89,7 +89,7 @@ def main():
         filter_cids.append(str(args.admin_id))
 
     archivist = Archivist(logger,
-                          chatdir="chatlogs/",
+                          chatdir="./chatlogs/",
                           chatext=".vls",
                           admin=args.admin_id,
                           filter_cids=filter_cids,
@@ -130,7 +130,7 @@ def main():
     speakerbot.wake(updater.bot, wake_msg)
 
     # Start the Bot
-    updater.start_polling(clean=True)
+    updater.start_polling()
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since

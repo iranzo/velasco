@@ -27,10 +27,10 @@ class Archivist(object):
         self.bypass = bypass
 
     def chat_folder(self, *formatting, **key_format):
-        return ("./" + self.chatdir + "chat_{tag}").format(*formatting, **key_format)
+        return (self.chatdir + "chat_{tag}").format(*formatting, **key_format)
 
     def chat_file(self, *formatting, **key_format):
-        return ("./" + self.chatdir + "chat_{tag}/{file}{ext}").format(*formatting, **key_format)
+        return (self.chatdir + "chat_{tag}/{file}{ext}").format(*formatting, **key_format)
 
     def store(self, tag, data, gen):
         chat_folder = self.chat_folder(tag=tag)
