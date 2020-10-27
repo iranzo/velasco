@@ -68,7 +68,8 @@ class Speaker(object):
         self.repeat = repeat
         self.filter_cids = filter_cids
         self.memory = MemoryList(memory)
-        self.memory_timer = time.perf_counter()
+        self.save_time = save_time
+        self.memory_timer = int(time.perf_counter())
         self.admin = admin
         self.bypass = bypass
         self.max_len = max_len
@@ -154,7 +155,7 @@ class Speaker(object):
         current_time = int(time.perf_counter())
         elapsed = (current_time - self.memory_timer)
         self.logger.debug("Save check: {}".format(elapsed))
-        return elapsed < self.save_time
+        return elapsed >= self.save_time
 
     def save(self):
         if self.should_save():
