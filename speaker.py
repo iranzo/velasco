@@ -2,13 +2,14 @@
 
 import random
 import time
+from sys import stderr
 from memorylist import MemoryList
 from reader import Reader, get_chat_title
-from telegram.error import TimedOut, NetworkError
+from telegram.error import NetworkError
 
 
 def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+    print(*args, end=' ', file=stderr, **kwargs)
 
 
 def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
@@ -18,8 +19,8 @@ def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
     if text.startswith(Reader.TAG_PREFIX):
         words = text.split(maxsplit=1)
         if logger:
-            # logger.info('Sending {} "{}" to {}'.format(words[0][4:-1], words[1], cid))
-            eprint('.')
+            logger.info('Sending {} "{}" to {}'.format(words[0][4:-1], words[1], cid))
+            # eprint('[]')
             # Logs something like 'Sending VIDEO "VIDEO_ID" to CHAT_ID'
 
         if words[0] == Reader.STICKER_TAG:
@@ -33,37 +34,48 @@ def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
         if logger:
             mtype = "reply" if replying else "message"
             logger.info("Sending a {} to {}: '{}'".format(mtype, cid, text))
+            # eprint('.')
         return bot.send_message(cid, text, **kwargs)
 
 
 class Speaker(object):
     ModeFixed = "FIXED_MODE"
-    ModeChance = "MODE_CHANCE"
+    ModeChance = "CHANCE_MODE"
 
-    def __init__(self, username, archivist, logger, nicknames=[], mute_time=60,
+    def __init__(self, username, archivist, logger, admin=0, nicknames=[],
                  reply=0.1, repeat=0.05, wakeup=False, mode=ModeFixed,
-                 memory=20
+                 memory=20, mute_time=60, save_time=3600, bypass=False,
+                 filter_cids=[], max_len=50
                  ):
         self.names = nicknames
         self.mute_time = mute_time
+        self.mute_timer = None
         self.username = username
-        self.archivist = archivist
+
+        self.max_period = archivist.max_period
+        self.get_reader_file = archivist.get_reader
+        self.store_file = archivist.store
+        self.readers_pass = archivist.readers_pass
+
         logger.info("----")
         logger.info("Finished loading.")
         logger.info("Loaded {} chats.".format(archivist.chat_count()))
         logger.info("----")
+
         self.wakeup = wakeup
         self.logger = logger
         self.reply = reply
         self.repeat = repeat
-        self.filter_cids = archivist.filter_cids
-        self.bypass = archivist.bypass
-        self.time_counter = None
+        self.filter_cids = filter_cids
         self.memory = MemoryList(memory)
+        self.memory_timer = time.perf_counter()
+        self.admin = admin
+        self.bypass = bypass
+        self.max_len = max_len
 
     def announce(self, bot, announcement, check=(lambda _: True)):
         # Sends an announcement to all chats that pass the check
-        for reader in self.archivist.readers_pass():
+        for reader in self.readers_pass():
             try:
                 if check(reader):
                     send(bot, reader.cid(), announcement)
@@ -74,7 +86,7 @@ class Speaker(object):
     def wake(self, bot, wake):
         # If wakeup flag is set, sends a wake-up message as announcement to all chats that
         # are groups. Also, always sends a wakeup message to the 'bot admin'
-        send(bot, self.archivist.admin, wake)
+        send(bot, self.admin, wake)
 
         if self.wakeup:
             def group_check(reader):
@@ -90,9 +102,9 @@ class Speaker(object):
         if reader is not None:
             return reader
 
-        reader = self.archivist.get_reader(cid)
+        reader = self.get_reader_file(cid)
         if not reader:
-            reader = Reader.FromChat(chat, self.archivist.max_period, self.logger)
+            reader = Reader.FromChat(chat, self.max_period, self.logger)
 
         old_reader = self.memory.append(reader)
         if old_reader is not None:
@@ -104,7 +116,7 @@ class Speaker(object):
     def access_reader(self, cid):
         reader = self.get_reader(cid)
         if reader is None:
-            return self.archivist.get_reader(cid)
+            return self.get_reader_file(cid)
         return reader
 
     def mentioned(self, text):
@@ -117,7 +129,7 @@ class Speaker(object):
 
     def is_mute(self):
         current_time = int(time.perf_counter())
-        return self.time_counter is not None and (current_time - self.time_counter) < self.mute_time
+        return self.mute_timer is not None and (current_time - self.mute_timer) < self.mute_time
 
     def should_reply(self, message, reader):
         if self.is_mute():
@@ -136,9 +148,25 @@ class Speaker(object):
         if reader is None:
             raise ValueError("Tried to store a None Reader.")
         else:
-            self.archivist.store(*reader.archive())
+            self.store_file(*reader.archive())
+
+    def should_save(self):
+        current_time = int(time.perf_counter())
+        elapsed = (current_time - self.memory_timer)
+        self.logger.debug("Save check: {}".format(elapsed))
+        return elapsed < self.save_time
+
+    def save(self):
+        if self.should_save():
+            self.logger.info("Saving chats in memory...")
+            for reader in self.memory:
+                self.store(reader)
+            self.memory_timer = time.perf_counter()
+            self.logger.info("Chats saved.")
 
     def read(self, update, context):
+        self.save()
+
         if update.message is None:
             return
         chat = update.message.chat
@@ -178,18 +206,19 @@ class Speaker(object):
         self.say(context.bot, reader, replying=rid)
 
     def user_is_admin(self, member):
-        # self.logger.info("user {} ({}) requesting a restricted action".format(str(member.user.id), member.user.name))
-        # self.logger.info("Bot Creator ID is {}".format(str(self.archivist.admin)))
+        self.logger.info("user {} ({}) requesting a restricted action".format(str(member.user.id), member.user.name))
+        # eprint('!')
+        # self.logger.info("Bot Creator ID is {}".format(str(self.admin)))
         return ((member.status == 'creator')
                 or (member.status == 'administrator')
-                or (member.user.id == self.archivist.admin))
+                or (member.user.id == self.admin))
 
     def speech(self, reader):
-        return reader.generate_message(self.archivist.max_len)
+        return reader.generate_message(self.max_len)
 
     def say(self, bot, reader, replying=None, **kwargs):
         cid = reader.cid()
-        if self.filter_cids is not None and cid not in self.filter_cids:
+        if cid not in self.filter_cids:
             return
         if self.is_mute():
             return
@@ -197,17 +226,14 @@ class Speaker(object):
         try:
             send(bot, cid, self.speech(reader), replying, logger=self.logger, **kwargs)
             if self.bypass:
-                max_period = self.archivist.max_period
+                max_period = self.max_period
                 reader.set_period(random.randint(max_period // 4, max_period))
             if random.random() <= self.repeat:
                 send(bot, cid, self.speech(reader), logger=self.logger, **kwargs)
-        except TimedOut as e:
-            self.logger.error("Telegram timed out.")
-            self.logger.exception(e)
         except NetworkError as e:
             if '429' in e.message:
                 self.logger.error("Error: TooManyRequests. Going mute for {} seconds.".format(self.mute_time))
-                self.time_counter = int(time.perf_counter())
+                self.mute_timer = int(time.perf_counter())
             else:
                 self.logger.error("Sending a message caused network error:")
                 self.logger.exception(e)
@@ -223,7 +249,7 @@ class Speaker(object):
         update.message.reply_text("I remember {} messages.".format(num))
 
     def get_chats(self, update, context):
-        lines = ["[{}]: {}".format(reader.cid(), reader.title()) for reader in self.archivist.readers_pass]
+        lines = ["[{}]: {}".format(reader.cid(), reader.title()) for reader in self.readers_pass()]
         chat_list = "\n".join(lines)
         update.message.reply_text("I have the following chats:\n\n" + chat_list)
 
@@ -245,7 +271,7 @@ class Speaker(object):
             period = int(words[1])
             period = reader.set_period(period)
             update.message.reply_text("Period of speaking set to {}.".format(period))
-            self.archivist.store(*reader.archive())
+            self.store_file(*reader.archive())
         except Exception:
             update.message.reply_text("Format was confusing; period unchanged from {}.".format(reader.period()))
 
@@ -267,7 +293,7 @@ class Speaker(object):
             answer = float(words[1])
             answer = reader.set_answer(answer)
             update.message.reply_text("Answer probability set to {}.".format(answer))
-            self.archivist.store(*reader.archive())
+            self.store_file(*reader.archive())
         except Exception:
             update.message.reply_text("Format was confusing; answer probability unchanged from {}.".format(reader.answer()))
 
@@ -286,7 +312,7 @@ class Speaker(object):
         reader.toggle_restrict()
         allowed = "let only admins" if reader.is_restricted() else "let everyone"
         update.message.reply_text("I will {} configure me now.".format(allowed))
-        self.archivist.store(*reader.archive())
+        self.store_file(*reader.archive())
 
     def silence(self, update, context):
         if "group" not in update.message.chat.type:
@@ -303,7 +329,7 @@ class Speaker(object):
         reader.toggle_silence()
         allowed = "avoid mentioning" if reader.is_silenced() else "mention"
         update.message.reply_text("I will {} people now.".format(allowed))
-        self.archivist.store(*reader.archive())
+        self.store_file(*reader.archive())
 
     def who(self, update, context):
         msg = update.message

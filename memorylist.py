@@ -64,3 +64,6 @@ class MemoryList(MutableSequence):
             self._list.remove(val)
             self._list.append(val)
         return val
+
+    def remove(self, val):
+        self._list.remove(val)

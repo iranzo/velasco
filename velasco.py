@@ -73,11 +73,22 @@ def stop(update, context):
 def main():
     global speakerbot
     parser = argparse.ArgumentParser(description='A Telegram markov bot.')
-    parser.add_argument('token', metavar='TOKEN', help='The Bot Token to work with the Telegram Bot API')
-    parser.add_argument('admin_id', metavar='ADMIN_ID', type=int, help='The ID of the Telegram user that manages this bot')
-    parser.add_argument('-w', '--wakeup', action='store_true', help='Flag that makes the bot send a first message to all chats during wake up.')
-    parser.add_argument('-f', '--filter', nargs='*', metavar='FILTER_CID', help='Zero or more chat IDs to add in a filter whitelist (default is empty, all chats allowed)')
-    parser.add_argument('-n', '--nicknames', nargs='*', metavar='NICKNAME', help='Any possible nicknames that the bot could answer to.')
+    parser.add_argument('token', metavar='TOKEN',
+                        help='The Bot Token to work with the Telegram Bot API')
+    parser.add_argument('admin_id', metavar='ADMIN_ID', type=int, default=0,
+                        help='The ID of the Telegram user that manages this bot')
+    parser.add_argument('-w', '--wakeup', action='store_true',
+                        help='Flag that makes the bot send a first message to all chats during wake up.')
+    parser.add_argument('-f', '--filter', nargs='*', default=[], metavar='cid',
+                        help='Zero or more chat IDs to add in a filter whitelist (default is empty, all chats allowed)')
+    parser.add_argument('-n', '--nicknames', nargs='*', default=[], metavar='name',
+                        help='Any possible nicknames that the bot could answer to.')
+    parser.add_argument('-d', '--directory', metavar='CHATLOG_DIR', default='./chatlogs',
+                        help='The chat logs directory path (default: "./chatlogs").')
+    parser.add_argument('-m', '--mute_time', metavar='T', type=int, default=60,
+                        help='The time (in s) for the muting period when Telegram limits the bot. (default: 60).')
+    parser.add_argument('-s', '--save_time', metavar='T', type=int, default=3600,
+                        help='The time (in s) for periodic saves (default: 3600).')
 
     args = parser.parse_args()
 
@@ -89,15 +100,21 @@ def main():
         filter_cids.append(str(args.admin_id))
 
     archivist = Archivist(logger,
-                          chatdir="./chatlogs/",
+                          chatdir=args.directory,
                           chatext=".vls",
-                          admin=args.admin_id,
-                          filter_cids=filter_cids,
                           read_only=False
                           )
 
     username = updater.bot.get_me().username
-    speakerbot = Speaker("@" + username, archivist, logger, nicknames=args.nicknames, wakeup=args.wakeup)
+    speakerbot = Speaker("@" + username,
+                         archivist,
+                         logger,
+                         admin=args.admin_id,
+                         filter_cids=filter_cids,
+                         nicknames=args.nicknames,
+                         wakeup=args.wakeup,
+                         mute_time=args.mute_time,
+                         save_time=args.save_time)
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -109,7 +126,7 @@ def main():
     dp.add_handler(CommandHandler("help", static_reply(help_msg)))
     dp.add_handler(CommandHandler("count", speakerbot.get_count))
     dp.add_handler(CommandHandler("period", speakerbot.period))
-    dp.add_handler(CommandHandler("list", speakerbot.get_chats, filters=Filters.chat(chat_id=archivist.admin)))
+    dp.add_handler(CommandHandler("list", speakerbot.get_chats, filters=Filters.chat(chat_id=speakerbot.admin)))
     # dp.add_handler(CommandHandler("user", get_name, Filters.chat(chat_id=archivist.admin)))
     # dp.add_handler(CommandHandler("id", get_id))
     dp.add_handler(CommandHandler("stop", stop))

@@ -7,8 +7,8 @@ from generator import Generator
 class Archivist(object):
 
     def __init__(self, logger, chatdir=None, chatext=None, admin=0,
-                 period_inc=5, save_count=15, max_period=100000, max_len=50,
-                 read_only=False, filter_cids=None, bypass=False
+                 period_inc=5, save_count=15, max_period=100000,
+                 read_only=False
                  ):
         if chatdir is None or len(chatdir) == 0:
             chatdir = "./"
@@ -17,20 +17,16 @@ class Archivist(object):
         self.logger = logger
         self.chatdir = chatdir
         self.chatext = chatext
-        self.admin = admin
         self.period_inc = period_inc
         self.save_count = save_count
         self.max_period = max_period
-        self.max_len = max_len
         self.read_only = read_only
-        self.filter_cids = filter_cids
-        self.bypass = bypass
 
     def chat_folder(self, *formatting, **key_format):
-        return (self.chatdir + "chat_{tag}").format(*formatting, **key_format)
+        return (self.chatdir + "/chat_{tag}").format(*formatting, **key_format)
 
     def chat_file(self, *formatting, **key_format):
-        return (self.chatdir + "chat_{tag}/{file}{ext}").format(*formatting, **key_format)
+        return (self.chatdir + "/chat_{tag}/{file}{ext}").format(*formatting, **key_format)
 
     def store(self, tag, data, gen):
         chat_folder = self.chat_folder(tag=tag)
@@ -121,10 +117,7 @@ class Archivist(object):
                     reader = self.get_reader(cid)
                     # self.logger.info("Chat {} contents:\n{}".format(cid, reader.card.dumps()))
                     self.logger.info("Successfully passed through {} ({}) chat.\n".format(cid, reader.title()))
-                    if self.bypass:  # I forgot what I made this for
-                        reader.set_period(random.randint(self.max_period // 2, self.max_period))
-                        self.store(*reader.archive())
-                    elif reader.period() > self.max_period:
+                    if reader.period() > self.max_period:
                         reader.set_period(self.max_period)
                         self.store(*reader.archive())
                     yield reader
