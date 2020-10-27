@@ -98,7 +98,7 @@ class Generator(object):
         # otherwise
         return Generator(load=dump, mode=Generator.MODE_JSON)
 
-    def load(self, f):
+    def load(f):
         return Generator(load=json.load(f), mode=Generator.MODE_DICT)
 
     def add(self, text):
