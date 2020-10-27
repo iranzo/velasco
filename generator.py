@@ -55,6 +55,9 @@ class Generator(object):
     MODE_LIST = "MODE_LIST"
     # This is to mark when we want to create a Generator object from a given list of words
 
+    MODE_DICT = "MODE_DICT"
+    # This is to mark when we want to create a Generator object from a given dictionary
+
     MODE_CHAT_DATA = "MODE_CHAT_DATA"
     # This is to mark when we want to create a Generator object from Chat data (WIP)
 
@@ -69,6 +72,8 @@ class Generator(object):
             elif mode == Generator.MODE_LIST:
                 self.cache = {}
                 self.load_list(load)
+            elif mode == Generator.MODE_DICT:
+                self.cache = load
         else:
             self.cache = {}
             # The cache is where we store our words
@@ -82,6 +87,9 @@ class Generator(object):
         # Dumps the cache dictionary into a JSON-formatted string
         return json.dumps(self.cache, ensure_ascii=False)
 
+    def dump(self, f):
+        json.dump(self.cache, f, ensure_ascii=False, indent='')
+
     def loads(dump):
         # Loads the cache dictionary from a JSON-formatted string
         if len(dump) == 0:
@@ -89,6 +97,9 @@ class Generator(object):
             return Generator()
         # otherwise
         return Generator(load=dump, mode=Generator.MODE_JSON)
+
+    def load(self, f):
+        return Generator(load=json.load(f), mode=Generator.MODE_DICT)
 
     def add(self, text):
         # This takes a string and stores it in the cache, preceding it

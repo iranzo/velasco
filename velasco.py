@@ -85,6 +85,8 @@ def main():
                         help='Any possible nicknames that the bot could answer to.')
     parser.add_argument('-d', '--directory', metavar='CHATLOG_DIR', default='./chatlogs',
                         help='The chat logs directory path (default: "./chatlogs").')
+    parser.add_argument('-c', '--capacity', metavar='C', type=int, default=20,
+                        help='The memory capacity for the last C updated chats. (default: 20).')
     parser.add_argument('-m', '--mute_time', metavar='T', type=int, default=60,
                         help='The time (in s) for the muting period when Telegram limits the bot. (default: 60).')
     parser.add_argument('-s', '--save_time', metavar='T', type=int, default=3600,
@@ -113,6 +115,7 @@ def main():
                          filter_cids=filter_cids,
                          nicknames=args.nicknames,
                          wakeup=args.wakeup,
+                         memory=args.capacity,
                          mute_time=args.mute_time,
                          save_time=args.save_time)
 

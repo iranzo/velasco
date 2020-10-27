@@ -232,12 +232,10 @@ class Speaker(object):
             if random.random() <= self.repeat:
                 send(bot, cid, self.speech(reader), logger=self.logger, **kwargs)
         except NetworkError as e:
-            if '429' in e.message:
-                self.logger.error("Error: TooManyRequests. Going mute for {} seconds.".format(self.mute_time))
-                self.mute_timer = int(time.perf_counter())
-            else:
-                self.logger.error("Sending a message caused network error:")
-                self.logger.exception(e)
+            self.logger.error("Sending a message caused network error:")
+            self.logger.exception(e)
+            self.logger.error("Going mute for {} seconds.".format(self.mute_time))
+            self.mute_timer = int(time.perf_counter())
         except Exception as e:
             self.logger.error("Sending a message caused exception:")
             self.logger.exception(e)

@@ -1,5 +1,5 @@
 
-import os, random
+import os
 from reader import Reader
 from generator import Generator
 
@@ -28,7 +28,7 @@ class Archivist(object):
     def chat_file(self, *formatting, **key_format):
         return (self.chatdir + "/chat_{tag}/{file}{ext}").format(*formatting, **key_format)
 
-    def store(self, tag, data, gen):
+    def store(self, tag, data, vocab_dumper):
         chat_folder = self.chat_folder(tag=tag)
         chat_card = self.chat_file(tag=tag, file="card", ext=".txt")
 
@@ -45,17 +45,17 @@ class Archivist(object):
         file.write(data)
         file.close()
 
-        if gen is not None:
+        if vocab_dumper is not None:
             chat_record = self.chat_file(tag=tag, file="record", ext=self.chatext)
             file = open(chat_record, 'w', encoding="utf-16")
-            file.write(gen)
+            vocab_dumper(file)
             file.close()
 
     def load_vocab(self, tag):
         filepath = self.chat_file(tag=tag, file="record", ext=self.chatext)
         try:
             file = open(filepath, 'r', encoding="utf-16")
-            record = file.read()
+            record = Generator.load(file)
             file.close()
             return record
         except Exception as e:
@@ -89,10 +89,8 @@ class Archivist(object):
     def get_reader(self, tag):
         reader = self.load_reader(tag)
         if reader:
-            vocab_dump = self.load_vocab(tag)
-            if vocab_dump:
-                vocab = Generator.loads(vocab_dump)
-            else:
+            vocab = self.load_vocab(tag)
+            if not vocab:
                 vocab = Generator()
             return Reader.FromCard(reader, vocab, self.max_period, self.logger)
         else:

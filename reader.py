@@ -90,7 +90,7 @@ class Reader(object):
         # Returns a nice lice little tuple package for the archivist to save to file.
         # Also commits to long term memory any pending short term memories
         self.commit_memory()
-        return (self.meta.id, self.meta.dumps(), self.vocab.dumps())
+        return (self.meta.id, self.meta.dumps(), self.vocab.dump)
 
     def check_type(self, t):
         # Checks type. Returns "True" for "group" even if it's supergroup
