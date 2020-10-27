@@ -79,7 +79,7 @@ def main():
                         help='The ID of the Telegram user that manages this bot')
     parser.add_argument('-w', '--wakeup', action='store_true',
                         help='Flag that makes the bot send a first message to all chats during wake up.')
-    parser.add_argument('-f', '--filter', nargs='*', default=[], metavar='cid',
+    parser.add_argument('-f', '--filter', nargs='*', default=None, metavar='cid',
                         help='Zero or more chat IDs to add in a filter whitelist (default is empty, all chats allowed)')
     parser.add_argument('-n', '--nicknames', nargs='*', default=[], metavar='name',
                         help='Any possible nicknames that the bot could answer to.')
@@ -112,7 +112,7 @@ def main():
                          archivist,
                          logger,
                          admin=args.admin_id,
-                         filter_cids=filter_cids,
+                         cid_whitelist=filter_cids,
                          nicknames=args.nicknames,
                          wakeup=args.wakeup,
                          memory=args.capacity,

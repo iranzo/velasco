@@ -45,7 +45,7 @@ class Speaker(object):
     def __init__(self, username, archivist, logger, admin=0, nicknames=[],
                  reply=0.1, repeat=0.05, wakeup=False, mode=ModeFixed,
                  memory=20, mute_time=60, save_time=3600, bypass=False,
-                 filter_cids=[], max_len=50
+                 cid_whitelist=None, max_len=50
                  ):
         self.names = nicknames
         self.mute_time = mute_time
@@ -66,7 +66,7 @@ class Speaker(object):
         self.logger = logger
         self.reply = reply
         self.repeat = repeat
-        self.filter_cids = filter_cids
+        self.cid_whitelist = cid_whitelist
         self.memory = MemoryList(memory)
         self.save_time = save_time
         self.memory_timer = int(time.perf_counter())
@@ -219,7 +219,7 @@ class Speaker(object):
 
     def say(self, bot, reader, replying=None, **kwargs):
         cid = reader.cid()
-        if cid not in self.filter_cids:
+        if self.cid_whitelist is not None and cid not in self.cid_whitelist:
             return
         if self.is_mute():
             return
