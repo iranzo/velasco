@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
+# This reads a line in the format 'VARIABLE=value' and gives me the value.
+# See Metadata.loadl(...) for more details
 def parse_card_line(line):
-    # This reads a line in the format 'VARIABLE=value' and gives me the value.
-    # See Metadata.loadl(...) for more details
     s = line.split('=', 1)
     if len(s) < 2:
         return ""
@@ -10,35 +10,37 @@ def parse_card_line(line):
         return s[1]
 
 
+# This is a chat's Metadata, holding different configuration values for
+# Velasco and other miscellaneous information about the chat
 class Metadata(object):
-    # This is a chat's Metadata, holding different configuration values for
-    # Velasco and other miscellaneous information about the chat
-
     def __init__(self, cid, ctype, title, count=0, period=None, answer=0.5, restricted=False, silenced=False):
-        self.id = str(cid)
         # The Telegram chat's ID
-        self.type = ctype
+        self.id = str(cid)
         # The type of chat
-        self.title = title
+        self.type = ctype
         # The title of the chat
+        self.title = title
         if period is None:
             if "group" in ctype:
-                period = 10
                 # Default period for groups and supergroups
+                period = 10
             else:
-                period = 2
                 # Default period for private or channel chats
+                period = 2
+        # The number of messages read in a chat
         self.count = count
-        # The number of messages read
-        self.period = period
         # This chat's configured period
-        self.answer = answer
+        self.period = period
         # This chat's configured answer probability
-        self.restricted = restricted
+        self.answer = answer
         # Wether some interactions are restricted to admins only
-        self.silenced = silenced
+        self.restricted = restricted
         # Wether messages should silence user mentions
+        self.silenced = silenced
 
+    # Sets the period for a chat
+    # It has to be higher than 1
+    # Returns the new value
     def set_period(self, period):
         if period < 1:
             raise ValueError('Tried to set period a value less than 1.')
@@ -46,6 +48,9 @@ class Metadata(object):
             self.period = period
         return self.period
 
+    # Sets the answer probability
+    # It's a percentage represented as a decimal between 0 and 1
+    # Returns the new value
     def set_answer(self, prob):
         if prob > 1:
             raise ValueError('Tried to set answer probability higher than 1.')
@@ -55,6 +60,8 @@ class Metadata(object):
             self.answer = prob
         return self.answer
 
+    # Dumps the metadata into a list of lines, then joined together in a string,
+    # ready to be written into a file
     def dumps(self):
         lines = ["CARD=v5"]
         lines.append("CHAT_ID=" + self.id)
@@ -68,10 +75,12 @@ class Metadata(object):
         # lines.append("WORD_DICT=")
         return ('\n'.join(lines)) + '\n'
 
+    # Creates a Metadata object from a previous text dump
     def loads(text):
         lines = text.splitlines()
         return Metadata.loadl(lines)
 
+    # Creates a Metadata object from a list of metadata lines
     def loadl(lines):
         # In a perfect world, I would get both the variable name and its corresponding value
         # from each side of the lines, but I know the order in which the lines are writen in
@@ -90,6 +99,14 @@ class Metadata(object):
                             silenced=(parse_card_line(lines[8]) == 'True')
                             )
         elif version == "v3":
+            # Deprecated: this elif block will be removed in a new version
+            print("Warning! This Card format ({}) is deprecated. Update all".format(version),
+                  "your files in case that there are still some left in old formats before",
+                  "downloading the next update.")
+
+            # This is kept for retrocompatibility purposes, in case someone did a fork
+            # of this repo and still has some chat files that haven't been updated in
+            # a long while -- but I already converted all my files to v5
             return Metadata(cid=parse_card_line(lines[1]),
                             ctype=parse_card_line(lines[2]),
                             title=parse_card_line(lines[3]),
@@ -99,6 +116,12 @@ class Metadata(object):
                             restricted=(parse_card_line(lines[6]) == 'True')
                             )
         elif version == "v2":
+            # Deprecated: this elif block will be removed in a new version
+            print("Warning! This Card format ({}) is deprecated. Update all".format(version),
+                  "your files in case that there are still some left in old formats before",
+                  "downloading the next update.")
+
+            # Also kept for retrocompatibility purposes
             return Metadata(cid=parse_card_line(lines[1]),
                             ctype=parse_card_line(lines[2]),
                             title=parse_card_line(lines[3]),
@@ -107,6 +130,12 @@ class Metadata(object):
                             answer=float(parse_card_line(lines[5]))
                             )
         elif version == "dict:":
+            # Deprecated: this elif block will be removed in a new version
+            print("Warning! This Card format ('dict') is deprecated. Update all",
+                  "your files in case that there are still some left in old formats before",
+                  "downloading the next update.")
+
+            # Also kept for retrocompatibility purposes
             # At some point I decided to number the versions of each dictionary format,
             # but this was not always the case. This is what you get if you try to read
             # whatever there is in very old files where the version should be
@@ -117,7 +146,13 @@ class Metadata(object):
                             period=int(lines[3])
                             )
         else:
-            # This is for the oldest of files
+            # Deprecated: this elif block will be removed in a new version
+            print("Warning! This ancient Card format is deprecated. Update all",
+                  "your files in case that there are still some left in old formats before",
+                  "downloading the next update.")
+
+            # Also kept for retrocompatibility purposes
+            # This is for the oldest of file formats
             return Metadata(cid=lines[0],
                             ctype=lines[1],
                             title=lines[2],

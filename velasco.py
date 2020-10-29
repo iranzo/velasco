@@ -90,7 +90,11 @@ def main():
     parser.add_argument('-m', '--mute_time', metavar='T', type=int, default=60,
                         help='The time (in s) for the muting period when Telegram limits the bot. (default: 60).')
     parser.add_argument('-s', '--save_time', metavar='T', type=int, default=3600,
-                        help='The time (in s) for periodic saves (default: 3600).')
+                        help='The time (in s) for periodic saves. (default: 3600)')
+    parser.add_argument('-p', '--min_period', metavar='MIN_P', type=int, default=1,
+                        help='The minimum value for a chat\'s period. (default: 1)')
+    parser.add_argument('-P', '--max_period', metavar='MAX_P', type=int, default=100000,
+                        help='The maximum value for a chat\'s period. (default: 100000)')
 
     args = parser.parse_args()
 
@@ -104,6 +108,8 @@ def main():
     archivist = Archivist(logger,
                           chatdir=args.directory,
                           chatext=".vls",
+                          min_period=args.min_period,
+                          max_period=args.max_period,
                           read_only=False
                           )
 

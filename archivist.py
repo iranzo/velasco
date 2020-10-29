@@ -7,8 +7,8 @@ from generator import Generator
 class Archivist(object):
 
     def __init__(self, logger, chatdir=None, chatext=None, admin=0,
-                 period_inc=5, save_count=15, max_period=100000,
-                 read_only=False
+                 period_inc=5, save_count=15, min_period=1,
+                 max_period=100000, read_only=False
                  ):
         if chatdir is None or len(chatdir) == 0:
             chatdir = "./"
@@ -19,16 +19,20 @@ class Archivist(object):
         self.chatext = chatext
         self.period_inc = period_inc
         self.save_count = save_count
+        self.min_period = min_period
         self.max_period = max_period
         self.read_only = read_only
 
+    # Formats and returns a chat folder path
     def chat_folder(self, *formatting, **key_format):
         return (self.chatdir + "/chat_{tag}").format(*formatting, **key_format)
 
+    # Formats and returns a chat file path
     def chat_file(self, *formatting, **key_format):
         return (self.chatdir + "/chat_{tag}/{file}{ext}").format(*formatting, **key_format)
 
-    def store(self, tag, data, vocab_dumper):
+    # Stores a Reader/Generator file pair
+    def store(self, tag, data, vocab):
         chat_folder = self.chat_folder(tag=tag)
         chat_card = self.chat_file(tag=tag, file="card", ext=".txt")
 
@@ -45,17 +49,18 @@ class Archivist(object):
         file.write(data)
         file.close()
 
-        if vocab_dumper is not None:
+        if vocab is not None:
             chat_record = self.chat_file(tag=tag, file="record", ext=self.chatext)
             file = open(chat_record, 'w', encoding="utf-16")
-            vocab_dumper(file)
+            file.write(vocab)
             file.close()
 
+    # Loads a Generator's vocabulary file dump
     def load_vocab(self, tag):
         filepath = self.chat_file(tag=tag, file="record", ext=self.chatext)
         try:
             file = open(filepath, 'r', encoding="utf-16")
-            record = Generator.load(file)
+            record = file.read()
             file.close()
             return record
         except Exception as e:
@@ -63,6 +68,7 @@ class Archivist(object):
             self.logger.exception(e)
             return None
 
+    # Loads a Generator's vocabulary file dump in the old UTF-8 encoding
     def load_vocab_old(self, tag):
         filepath = self.chat_file(tag=tag, file="record", ext=self.chatext)
         try:
@@ -75,7 +81,8 @@ class Archivist(object):
             self.logger.exception(e)
             return None
 
-    def load_reader(self, tag):
+    # Loads a Metadata card file dump
+    def load_card(self, tag):
         filepath = self.chat_file(tag=tag, file="card", ext=".txt")
         try:
             reader_file = open(filepath, 'r')
@@ -86,16 +93,21 @@ class Archivist(object):
             self.logger.error("Metadata file {} not found.".format(filepath))
             return None
 
+    # Returns a Reader for a given ID with an already working vocabulary - be it
+    # new or loaded from file
     def get_reader(self, tag):
-        reader = self.load_reader(tag)
-        if reader:
-            vocab = self.load_vocab(tag)
-            if not vocab:
+        card = self.load_card(tag)
+        if card:
+            vocab_dump = self.load_vocab(tag)
+            if vocab_dump:
+                vocab = Generator.loads(vocab_dump)
+            else:
                 vocab = Generator()
-            return Reader.FromCard(reader, vocab, self.max_period, self.logger)
+            return Reader.FromCard(card, vocab, self.max_period, self.logger)
         else:
             return None
 
+    # Count the stored chats
     def chat_count(self):
         count = 0
         directory = os.fsencode(self.chatdir)
@@ -105,6 +117,7 @@ class Archivist(object):
                 count += 1
         return count
 
+    # Crawl through all the stored Readers
     def readers_pass(self):
         directory = os.fsencode(self.chatdir)
         for subdir in os.scandir(directory):
@@ -124,6 +137,7 @@ class Archivist(object):
                     self.logger.exception(e)
                     raise e
 
+    # Load and immediately store every Reader
     def update(self):
         for reader in self.readers_pass():
             if reader.vocab is None:

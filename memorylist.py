@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 
-from collections.abc import MutableSequence
+from collections.abc import Sequence
 
 
-class MemoryList(MutableSequence):
+class MemoryList(Sequence):
+    """Special "memory list" class that:
+       - Whenever an item is added that was already in the list,
+         it gets moved to the back instead
+       - Whenever an item is looked for, it gets moved to the
+         back
+       - If a new item is added that goes over a given capacity
+         limit, the item at the front (oldest accessed item)
+         is removed (and returned)"""
+
     def __init__(self, capacity, data=None):
-        """Initialize the class"""
         super(MemoryList, self).__init__()
         self._capacity = capacity
         if (data is not None):
@@ -16,26 +24,17 @@ class MemoryList(MutableSequence):
     def __repr__(self):
         return "<{0} {1}, capacity {2}>".format(self.__class__.__name__, self._list, self._capacity)
 
+    def __str__(self):
+        return "{0}, {1}/{2}".format(self._list, len(self._list), self._capacity)
+
     def __len__(self):
-        """List length"""
         return len(self._list)
 
     def capacity(self):
         return self._capacity
 
     def __getitem__(self, ii):
-        """Get a list item"""
         return self._list[ii]
-
-    def __delitem__(self, ii):
-        """Delete an item"""
-        del self._list[ii]
-
-    def __setitem__(self, ii, val):
-        self._list[ii] = val
-
-    def __str__(self):
-        return str(self._list)
 
     def __contains__(self, val):
         return val in self._list
@@ -43,10 +42,7 @@ class MemoryList(MutableSequence):
     def __iter__(self):
         return self._list.__iter__()
 
-    def insert(self, ii, val):
-        self._list.insert(ii, val)
-
-    def append(self, val):
+    def add(self, val):
         if val in self._list:
             self._list.remove(val)
 
@@ -58,8 +54,8 @@ class MemoryList(MutableSequence):
         else:
             return None
 
-    def get_next(self, cond):
-        val = next((v for v in self._list if cond(v)), None)
+    def search(self, cond, *args, **kwargs):
+        val = next((v for v in self._list if cond(v)), *args, **kwargs)
         if val is not None:
             self._list.remove(val)
             self._list.append(val)
