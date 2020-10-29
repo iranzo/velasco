@@ -103,7 +103,7 @@ class Archivist(object):
                 vocab = Generator.loads(vocab_dump)
             else:
                 vocab = Generator()
-            return Reader.FromCard(card, vocab, self.max_period, self.logger)
+            return Reader.FromCard(card, vocab, self.min_period, self.max_period, self.logger)
         else:
             return None
 
@@ -130,6 +130,9 @@ class Archivist(object):
                     self.logger.info("Successfully passed through {} ({}) chat.\n".format(cid, reader.title()))
                     if reader.period() > self.max_period:
                         reader.set_period(self.max_period)
+                        self.store(*reader.archive())
+                    elif reader.period() < self.min_period:
+                        reader.set_period(self.min_period)
                         self.store(*reader.archive())
                     yield reader
                 except Exception as e:

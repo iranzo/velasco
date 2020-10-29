@@ -1,14 +1,14 @@
 # Velascobot
 
-This is yet another Markov chain-based chatbot, based on the Twitterbot fad consisting of creating a bot account that would try to generate new random tweets (usually having `_ebooks` or `.txt` to indicate that an account was one of such, or just a plain `bot` suffix), using your own as a template. However, instead of reading the messages from a Twitter account, this bot is made to read the messages in a group chat, and try to blend in by generating new messages that fit the patterns seen in that specific group chat. At the beginning that will mean a lot of parroting, but eventually the bot starts coming up with sentences of itself.
+This is yet another Markov chain-based chatbot, based on the Twitterbot fad consisting of creating a bot account that would try to generate new random tweets (usually having `_ebooks` or `.txt` in their names to indicate that an account was one of such, or just a plain `bot` suffix), using your own as a template. However, instead of reading the messages from a Twitter account, this bot is made to read the messages in a group chat, and try to blend in by generating new messages that fit the patterns seen in that specific group chat. At the beginning that will mean a lot of parroting, but eventually the bot starts coming up with sentences of itself.
 
 This bot also works on private chats between a user and itself, but of course the training is much lower and it will feel like talking to a parrot for a longer time, unless you feed it a lot of messages quickly.
 
 ## How to use it
 
-You have to add the bot to a chat group, letting it rad and send messages. Maybe set some configuration commands too.
+You have to add the bot to a chat group, or speak to it privately, letting it read and send messages. Maybe set some configuration commands too.
 
-If you want to clone or fork this repo and host your own instance of Velasco, see MANUAL.md.
+If you want to clone or fork this repo and host your own instance of Velasco, see [MANUAL.md](MANUAL.md).
 
 ## Commands & ussage
 
@@ -38,9 +38,9 @@ Sending the command on its own (e.g. `/period`) tells you the current value. Sen
 
 ### Answer
 
-This value is the chance of the bot to answer to a message that is in turn a reply to one of its own messages, or (to be implemented:) to a message that mentions it. The default value is 0.5 (50% chance). The maximum is 1 (100% chance) and to disable it you must set it to 0 (0% chance).
+This value is the chance of the bot to answer to a message that is in turn a reply to one of its own messages, or to a message that mentions the bot (see above: [Summon](###Summon)). The default value is `0.5` (50% chance). The maximum is `1` (100% chance) and to disable it you must set it to 0 (0% chance).
 
-Sending the command on its own (e.g. `/answer`) tells you the current value. Sending a positive decimal number between 0 and 1 inclusive (e.g. `/answer 0.95`) will set it as the new value.
+Sending the command on its own (e.g. `/answer`) tells you the current value. Sending a positive decimal number between `0` and `1` inclusive (e.g. `/answer 0.95`) will set it as the new value.
 
 ### Restricted
 

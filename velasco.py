@@ -100,6 +100,8 @@ def main():
 
     args = parser.parse_args()
 
+    assert args.max_period >= args.min_period
+
     # Create the EventHandler and pass it your bot's token.
     updater = Updater(args.token, use_context=True)
 

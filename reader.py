@@ -34,7 +34,7 @@ class Reader(object):
     ANIM_TAG = "^IS_ANIMATION^"
     VIDEO_TAG = "^IS_VIDEO^"
 
-    def __init__(self, metadata, vocab, max_period, logger, names=[]):
+    def __init__(self, metadata, vocab, min_period, max_period, logger, names=[]):
         # The Metadata object holding a chat's specific bot parameters
         self.meta = metadata
         # The Generator object holding the vocabulary learned so far
@@ -51,22 +51,22 @@ class Reader(object):
         self.names = names
 
     # Create a new Reader from a Chat object
-    def FromChat(chat, max_period, logger):
+    def FromChat(chat, min_period, max_period, logger):
         meta = Metadata(chat.id, chat.type, get_chat_title(chat))
         vocab = Generator()
-        return Reader(meta, vocab, max_period, logger)
+        return Reader(meta, vocab, min_period, max_period, logger)
 
     # TODO: Create a new Reader from a whole Chat history
-    def FromHistory(history, vocab, max_period, logger):
+    def FromHistory(history, vocab, min_period, max_period, logger):
         return None
 
     # Create a new Reader from a meta's file dump
-    def FromCard(meta, vocab, max_period, logger):
-        metadata = Metadata.loads(meta)
-        return Reader(metadata, vocab, max_period, logger)
+    def FromCard(card, vocab, min_period, max_period, logger):
+        meta = Metadata.loads(card)
+        return Reader(meta, vocab, min_period, max_period, logger)
 
     # Deprecated: this method will be removed in a new version
-    def FromFile(text, max_period, logger, vocab=None):
+    def FromFile(text, min_period, max_period, logger, vocab=None):
         print("Warning! This method of loading a Reader from file (Reader.FromFile(...))",
               "is deprecated, and will be removed from the next update. Use FromCard instead.")
 
@@ -76,7 +76,7 @@ class Reader(object):
         version = version if len(version.strip()) > 1 else lines[4]
         logger.info("Dictionary version: {} ({} lines)".format(version, len(lines)))
         if version == "v4" or version == "v5":
-            return Reader.FromCard(text, vocab, max_period, logger)
+            return Reader.FromCard(text, vocab, min_period, max_period, logger)
             # I stopped saving the chat metadata and the cache together
         elif version == "v3":
             meta = Metadata.loadl(lines[0:8])
@@ -95,7 +95,7 @@ class Reader(object):
             cache = lines[4:]
             vocab = Generator(load=cache, mode=Generator.MODE_LIST)
             # raise SyntaxError("Reader: Metadata format unrecognized.")
-        r = Reader(meta, vocab, max_period, logger)
+        r = Reader(meta, vocab, min_period, max_period, logger)
         return r
 
     # Returns a nice lice little tuple package for the archivist to save to file.
@@ -117,8 +117,8 @@ class Reader(object):
 
     # Sets a new period in the Metadata
     def set_period(self, period):
-        # The period has to be under max_period; otherwise, truncate to max_period
-        new_period = min(period, self.max_period)
+        # The period has to be in the range [min..max_period]; otherwise, clamp to said range
+        new_period = max(self.min_period, min(period, self.max_period))
         set_period = self.meta.set_period(new_period)
         if new_period == set_period and new_period < self.countdown:
             # If succesfully changed and the new period is less than the current

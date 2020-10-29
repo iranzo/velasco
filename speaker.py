@@ -62,7 +62,8 @@ class Speaker(object):
         self.mute_timer = None
         # The bot's username, "@" included
         self.username = username
-        # The maximum chat period for this bot
+        # The minimum and maximum chat period for this bot
+        self.min_period = archivist.min_period
         self.max_period = archivist.max_period
 
         # The Archivist functions to load and save from and to files
@@ -136,7 +137,7 @@ class Speaker(object):
 
         reader = self.get_reader_file(cid)
         if not reader:
-            reader = Reader.FromChat(chat, self.max_period, self.logger)
+            reader = Reader.FromChat(chat, self.min_period, self.max_period, self.logger)
 
         old_reader = self.memory.add(reader)
         if old_reader is not None:
@@ -289,8 +290,10 @@ class Speaker(object):
             send(bot, cid, self.speech(reader), replying, logger=self.logger, **kwargs)
             if self.bypass:
                 # Testing mode, force a reasonable period (to not have the bot spam one specific chat with a low period)
-                max_period = self.max_period
-                reader.set_period(random.randint(max_period // 4, max_period))
+                minp = self.min_period
+                maxp = self.max_period
+                rangep = maxp - minp
+                reader.set_period(random.randint(rangep // 4, rangep) + minp)
             if random.random() <= self.repeat:
                 send(bot, cid, self.speech(reader), logger=self.logger, **kwargs)
         # Consider any Network Error as a Telegram temporary ban, as I couldn't find
