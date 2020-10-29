@@ -38,7 +38,7 @@ Sending the command on its own (e.g. `/period`) tells you the current value. Sen
 
 ### Answer
 
-This value is the chance of the bot to answer to a message that is in turn a reply to one of its own messages, or to a message that mentions the bot (see above: [Summon](###Summon)). The default value is `0.5` (50% chance). The maximum is `1` (100% chance) and to disable it you must set it to 0 (0% chance).
+This value is the chance of the bot to answer to a message that is in turn a reply to one of its own messages, or to a message that mentions the bot (see above: [Summon](#summon)). The default value is `0.5` (50% chance). The maximum is `1` (100% chance) and to disable it you must set it to 0 (0% chance).
 
 Sending the command on its own (e.g. `/answer`) tells you the current value. Sending a positive decimal number between `0` and `1` inclusive (e.g. `/answer 0.95`) will set it as the new value.
 
@@ -49,3 +49,20 @@ This toggles the chat's *restriction* (off by default). Having the chat *restric
 ### Silenced
 
 This toggles the chat's *silence* (off by default). Having the chat *silenced* means that possible user mentions that may appear in randomly generated messages, will be disabled by enveloping the '@' between parentheses. This will avoid Telegram mention notifications, specially useful for those who have the group chat muted.
+
+## When does the bot send a message?
+
+The bot will send a message, guaranteed:
+
+- If someone sends the `/speak` command, and have permissions to do so.
+- If `period` messages have been read by the bot since the last time it sent a message.
+
+In addition, the bot will have a random chance to:
+
+- Reply to a message that mentions it (be it the username, like "@velascobot", or a name from a list of given nicknames, like "Velasco").
+  - The chance of this is the answer probability configured with the `/answer` command.
+  - This does not affect the `period` countdown.
+- Send a guaranteed message as a reply to a random recent read message (see [below](#readers-short-term-and-long-term-memory)) instead of sending it normally.
+  - The chance of this is the `reply` variable in `Speaker`, and the default is `1`.
+- Send a second message just after sending one (never a third one).
+  - The chance of this is the `repeat` variable in `Speaker`, and the default is `0.05`.
