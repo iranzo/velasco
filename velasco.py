@@ -44,6 +44,8 @@ help_msg = """I answer to the following commands:
 /answer - Change the probability to answer to a reply. (Decimal between 0 and 1).
 /restrict - Toggle restriction of configuration commands to admins only.
 /silence - Toggle restriction on mentions by the bot.
+/who - Tell general information about you and your message. For debugging purposes.
+/where - Tell my configuration for this chat.
 """
 
 about_msg = "I am yet another Markov Bot experiment. I read everything you type to me and then spit back nonsensical messages that look like yours.\n\nYou can send /explain if you want further explanation."
