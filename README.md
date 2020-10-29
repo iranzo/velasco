@@ -1,48 +1,68 @@
 # Velascobot
 
-This is yet another Markov chain-based chatbot, based on the Twitterbot fad consisting of creating a bot account that would try to generate new random tweets, using your own as a template. However, instead of reading the messages from a Twitter account, this bot is made to read the messages in a group chat, and try to blend in by generating new messages that fit the patterns seen in that specific group chat. At the beginning that will mean a lot of parroting, but eventually the bot starts coming up with sentences of itself.
+This is yet another Markov chain-based chatbot, based on the Twitterbot fad consisting of creating a bot account that would try to generate new random tweets (usually having `_ebooks` or `.txt` in their names to indicate that an account was one of such, or just a plain `bot` suffix), using your own as a template. However, instead of reading the messages from a Twitter account, this bot is made to read the messages in a group chat, and try to blend in by generating new messages that fit the patterns seen in that specific group chat. At the beginning that will mean a lot of parroting, but eventually the bot starts coming up with sentences of itself.
 
 This bot also works on private chats between a user and itself, but of course the training is much lower and it will feel like talking to a parrot for a longer time, unless you feed it a lot of messages quickly.
 
-## Markov chains
+## How to use it
 
-This bot uses Markov chains of 3 words for message generation. For each 3 consecutive words read, it will store the 3rd one as the word that follows the first 2 combined. This way, whenever it is generating a new sentence, it will always pick at random one of the stored words that follow the last 2 words of the message generated so far, combined.
+You have to add the bot to a chat group, or speak to it privately, letting it read and send messages. Maybe set some configuration commands too.
 
-## Storing
+If you want to clone or fork this repo and host your own instance of Velasco, see [MANUAL.md](MANUAL.md).
 
-The actual messages aren't stored. After they're processed and all the words have been assigned to lists under combinations of 2 words, the message is discarded, and only the dictionary with the lists of "following words" is stored. The words said in a chat may be visible, but from a certain point onwards its impossible to recreate with accuracy the exact messages said in a chat.
+## Commands & ussage
 
-The storing action is made sometimes when a configuration value is changed, and whenever the bot sends a message. If the bot crashes, all the words processed from the messages since the last one from Velascobot will be lost. For high `freq` values, this could be a considerable amount, but for small ones this is negligible. Still, the bot is not expected to crash often.
+### Help, About and Explain
 
-## Configuration commands
+The `/help` command lists the most useful available commands for the bot. The `/about` command has a short explanation on the purpose of this bot, and the `/explain` command goes a little further in detail.
+
+### Speak
+
+This will make the bot send a message, aside from the periodic messages. If the command message is a reply to a different message M, the bot's message will be a reply to M as well; otherwise, the bot will reply to the message with the command.
+
+### Summon
+
+This isn't a command per se, but mentioning the username (in this case, '@velascobot') or any of the configured nicknames (like 'velasco') will prompt a chance for the bot to answer.
+
+A summon of 3 or less words will not be processed, so you can call Velasco's name to your heart's content without having to worry for the bot learning to repeat a lot of short 'Velasco!' messages.
 
 ### Count
 
-This is the amount of messages that the bot remembers, this is, the amount of messages processed. The messages themselves aren't stored but there is a counter that increases each time a message is processed.
+This tells you the amount of messages that the bot has read so far. The messages themselves aren't stored, but there is a counter that increases each time a message is processed.
 
-### Freq
+### Period
 
-It comes from "frequency", and at the beginning it was, but now it's actually the opposite, the "period". This is the amount of messages that the bot waits for before sending a message of its own. Increase it to make it talk less often, and decrease it to make it talk more often.
+This is the amount of messages that the bot waits for before sending a message of its own. Increase it to make it talk less often, and decrease it to make it talk more often.
 
-Sending the command on its own tells you the current value. Sending a positive number with the command will set that as the new value.
+Sending the command on its own (e.g. `/period`) tells you the current value. Sending a positive number with the command (e.g. `/period 85`) will set that as the new value.
 
 ### Answer
 
-This value is the chance of the bot to answer to a message that is in turn a reply to one of its own messages, or (to be implemented:) to a message that mentions it. The default value is 0.5 (50% chance). The maximum is 1 (100% chance) and to disable it you must set it to 0 (0% chance).
+This value is the chance of the bot to answer to a message that is in turn a reply to one of its own messages, or to a message that mentions the bot (see above: [Summon](#summon)). The default value is `0.5` (50% chance). The maximum is `1` (100% chance) and to disable it you must set it to 0 (0% chance).
 
-Sending the command on its own tells you the current value. Sending a positive decimal number between 0 and 1 inclusive will set it as the new value.
+Sending the command on its own (e.g. `/answer`) tells you the current value. Sending a positive decimal number between `0` and `1` inclusive (e.g. `/answer 0.95`) will set it as the new value.
 
-## File hierarchy
+### Restricted
 
-For those who are interested in cloning or forking:
+This toggles the chat's *restriction* (off by default). Having the chat *restricted* means that only the administrators of a chat can send configuration commands, like `/period n` or `/answer n`, only they can force the bot to speak with the `/speak` command, and only they can summon the bot. The bot will still read all users' messages and will still send periodic messages for all to enjoy.
 
-- `velasco.py` is the file in charge of starting up the telegram bot itself
-- `speaker.py` is the file with all the functions for the commands that Velasco has
-- A *Speaker* is then the entity that receives the messages, and has 1 *Parrot* and 1 *Scriptorium*
-- The *Scriptorium* is a collection of *Scribes*. Each *Scribe* contains the metadata of a chat (title, ID number, the `freq`, etc) and the Markov dictionary associated to it
-- *Scribes* are defined in `scribe.py`
-- A *Parrot* is an entity that contains a Markov dictionary, and the *Speaker's Parrot* corresponds to the last chat that prompted a Velasco message. Whenever that happens, the *Parrot* for that chat is loaded, the corresponding *Scribe* teaches the *Parrot* the latest messages, and then the *Scribe* is stored along with the updated dictionary
-- A Markov dictionary is defined in `markov.py`
-- The *Archivist* (defined in `archivist.py`) is in charge of doing all file saves and loads
+### Silenced
 
-**Warning:** This hierarchy is pending an overhaul.
+This toggles the chat's *silence* (off by default). Having the chat *silenced* means that possible user mentions that may appear in randomly generated messages, will be disabled by enveloping the '@' between parentheses. This will avoid Telegram mention notifications, specially useful for those who have the group chat muted.
+
+## When does the bot send a message?
+
+The bot will send a message, guaranteed:
+
+- If someone sends the `/speak` command, and have permissions to do so.
+- If `period` messages have been read by the bot since the last time it sent a message.
+
+In addition, the bot will have a random chance to:
+
+- Reply to a message that mentions it (be it the username, like "@velascobot", or a name from a list of given nicknames, like "Velasco").
+  - The chance of this is the answer probability configured with the `/answer` command.
+  - This does not affect the `period` countdown.
+- Send a guaranteed message as a reply to a random recent read message (see [below](#readers-short-term-and-long-term-memory)) instead of sending it normally.
+  - The chance of this is the `reply` variable in `Speaker`, and the default is `1`.
+- Send a second message just after sending one (never a third one).
+  - The chance of this is the `repeat` variable in `Speaker`, and the default is `0.05`.
