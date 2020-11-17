@@ -4,4 +4,7 @@ misc/*
 bkp/*
 test/*
 *log*
-
+.token
+.uid
+.tox/
+.idea/
