@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import random
 import time
@@ -10,7 +11,7 @@ from telegram.error import NetworkError
 
 # Auxiliar print to stderr function (alongside logger messages)
 def eprint(*args, **kwargs):
-    print(*args, end=' ', file=stderr, **kwargs)
+    print(*args, end=" ", file=stderr, **kwargs)
 
 
 # Auxiliar message to send a text to a chat through a bot
@@ -49,11 +50,24 @@ class Speaker(object):
     # Marks if the "periodic" messages have a weighted random chance to be sent, depending on the period
     ModeChance = "CHANCE_MODE"
 
-    def __init__(self, username, archivist, logger, admin=0, nicknames=[],
-                 reply=0.1, repeat=0.05, wakeup=False, mode=ModeFixed,
-                 memory=20, mute_time=60, save_time=3600, bypass=False,
-                 cid_whitelist=None, max_len=50
-                 ):
+    def __init__(
+        self,
+        username,
+        archivist,
+        logger,
+        admin=0,
+        nicknames=[],
+        reply=0.1,
+        repeat=0.05,
+        wakeup=False,
+        mode=ModeFixed,
+        memory=20,
+        mute_time=60,
+        save_time=3600,
+        bypass=False,
+        cid_whitelist=None,
+        max_len=50,
+    ):
         # List of nicknames other than the username that the bot can be called as
         self.names = nicknames
         # Mute time for Telegram network errors
@@ -108,7 +122,9 @@ class Speaker(object):
             try:
                 if check(reader):
                     send(bot, reader.cid(), announcement)
-                    self.logger.info("Sending announcement to chat {}".format(reader.cid()))
+                    self.logger.info(
+                        "Sending announcement to chat {}".format(reader.cid())
+                    )
             except Exception:
                 pass
 
@@ -118,8 +134,10 @@ class Speaker(object):
         send(bot, self.admin, wake)
 
         if self.wakeup:
+
             def group_check(reader):
                 return reader.check_type("group")
+
             self.announce(bot, wake, group_check)
 
     # Looks up a reader in the memory list
@@ -137,7 +155,9 @@ class Speaker(object):
 
         reader = self.get_reader_file(cid)
         if not reader:
-            reader = Reader.FromChat(chat, self.min_period, self.max_period, self.logger)
+            reader = Reader.FromChat(
+                chat, self.min_period, self.max_period, self.logger
+            )
 
         old_reader = self.memory.add(reader)
         if old_reader is not None:
@@ -168,7 +188,10 @@ class Speaker(object):
     # Returns True if not enough time has passed since the last mute timestamp
     def is_mute(self):
         current_time = int(time.perf_counter())
-        return self.mute_timer is not None and (current_time - self.mute_timer) < self.mute_time
+        return (
+            self.mute_timer is not None
+            and (current_time - self.mute_timer) < self.mute_time
+        )
 
     # Series of checks to determine if the bot should reply to a specific message, aside
     # from the usual periodic messages
@@ -187,8 +210,9 @@ class Speaker(object):
         replied = message.reply_to_message
         text = message.text.casefold() if message.text else ""
         # Only if it's a reply to a message of ours or the bot is mentioned in the message
-        return (((replied is not None) and (replied.from_user.name == self.username))
-                or (self.mentioned(text)))
+        return (
+            (replied is not None) and (replied.from_user.name == self.username)
+        ) or (self.mentioned(text))
 
     def store(self, reader):
         if reader is None:
@@ -199,7 +223,7 @@ class Speaker(object):
     # Check if enough time for saving memory has passed
     def should_save(self):
         current_time = int(time.perf_counter())
-        elapsed = (current_time - self.memory_timer)
+        elapsed = current_time - self.memory_timer
         self.logger.debug("Save check: {}".format(elapsed))
         return elapsed >= self.save_time
 
@@ -245,7 +269,7 @@ class Speaker(object):
 
     # Handles /speak command
     def speak(self, update, context):
-        chat = (update.message.chat)
+        chat = update.message.chat
         reader = self.load_reader(chat)
 
         if not self.bypass and reader.is_restricted():
@@ -260,17 +284,23 @@ class Speaker(object):
         rid = replied.message_id if replied else mid
         words = update.message.text.split()
         if len(words) > 1:
-            reader.read(' '.join(words[1:]))
+            reader.read(" ".join(words[1:]))
         self.say(context.bot, reader, replying=rid)
 
     # Checks user permissions. Bot admin is always considered as having full permissions
     def user_is_admin(self, member):
-        self.logger.info("user {} ({}) requesting a restricted action".format(str(member.user.id), member.user.name))
+        self.logger.info(
+            "user {} ({}) requesting a restricted action".format(
+                str(member.user.id), member.user.name
+            )
+        )
         # eprint('!')
         # self.logger.info("Bot Creator ID is {}".format(str(self.admin)))
-        return ((member.status == 'creator')
-                or (member.status == 'administrator')
-                or (member.user.id == self.admin))
+        return (
+            (member.status == "creator")
+            or (member.status == "administrator")
+            or (member.user.id == self.admin)
+        )
 
     # Generate speech (message)
     def speech(self, reader):
@@ -317,7 +347,10 @@ class Speaker(object):
 
     # Handling /get_chats command (exclusive for bot admin)
     def get_chats(self, update, context):
-        lines = ["[{}]: {}".format(reader.cid(), reader.title()) for reader in self.readers_pass()]
+        lines = [
+            "[{}]: {}".format(reader.cid(), reader.title())
+            for reader in self.readers_pass()
+        ]
         chat_list = "\n".join(lines)
         update.message.reply_text("I have the following chats:\n\n" + chat_list)
 
@@ -329,7 +362,9 @@ class Speaker(object):
 
         words = update.message.text.split()
         if len(words) <= 1:
-            update.message.reply_text("The current speech period is {}".format(reader.period()))
+            update.message.reply_text(
+                "The current speech period is {}".format(reader.period())
+            )
             return
 
         if reader.is_restricted():
@@ -342,7 +377,11 @@ class Speaker(object):
             period = reader.set_period(period)
             update.message.reply_text("Period of speaking set to {}.".format(period))
         except Exception:
-            update.message.reply_text("Format was confusing; period unchanged from {}.".format(reader.period()))
+            update.message.reply_text(
+                "Format was confusing; period unchanged from {}.".format(
+                    reader.period()
+                )
+            )
 
     # Handling /answer command
     # Print the current answer probability or set a new one if one is given
@@ -352,7 +391,9 @@ class Speaker(object):
 
         words = update.message.text.split()
         if len(words) <= 1:
-            update.message.reply_text("The current answer probability is {}".format(reader.answer()))
+            update.message.reply_text(
+                "The current answer probability is {}".format(reader.answer())
+            )
             return
 
         if reader.is_restricted():
@@ -365,7 +406,11 @@ class Speaker(object):
             answer = reader.set_answer(answer)
             update.message.reply_text("Answer probability set to {}.".format(answer))
         except Exception:
-            update.message.reply_text("Format was confusing; answer probability unchanged from {}.".format(reader.answer()))
+            update.message.reply_text(
+                "Format was confusing; answer probability unchanged from {}.".format(
+                    reader.answer()
+                )
+            )
 
     # Handling /restrict command
     # Toggle the restriction value if it's a group chat and the user has permissions to do so
@@ -411,12 +456,19 @@ class Speaker(object):
         chtname = cht.title if cht.title else cht.first_name
         rdr = self.access_reader(str(cht.id))
 
-        answer = ("You're **{name}**, with username `{username}`, and "
-                  "id `{uid}`.\nYou're messaging in the chat named __{cname}__,"
-                  " of type {ctype}, with id `{cid}`, and timestamp `{tstamp}`."
-                  ).format(name=usr.full_name, username=usr.username,
-                           uid=usr.id, cname=chtname, cid=cht.id,
-                           ctype=rdr.ctype(), tstamp=str(msg.date))
+        answer = (
+            "You're **{name}**, with username `{username}`, and "
+            "id `{uid}`.\nYou're messaging in the chat named __{cname}__,"
+            " of type {ctype}, with id `{cid}`, and timestamp `{tstamp}`."
+        ).format(
+            name=usr.full_name,
+            username=usr.username,
+            uid=usr.id,
+            cname=chtname,
+            cid=cht.id,
+            ctype=rdr.ctype(),
+            tstamp=str(msg.date),
+        )
 
         msg.reply_markdown(answer)
 
@@ -434,11 +486,17 @@ class Speaker(object):
         else:
             permissions = "neither restricted nor silenced"
 
-        answer = ("You're messaging in the chat of saved title __{cname}__,"
-                  " with id `{cid}`, message count {c}, period {p}, and answer "
-                  "probability {a}.\n\nThis chat is {perm}."
-                  ).format(cname=reader.title(), cid=reader.cid(),
-                           c=reader.count(), p=reader.period(),
-                           a=reader.answer(), perm=permissions)
+        answer = (
+            "You're messaging in the chat of saved title __{cname}__,"
+            " with id `{cid}`, message count {c}, period {p}, and answer "
+            "probability {a}.\n\nThis chat is {perm}."
+        ).format(
+            cname=reader.title(),
+            cid=reader.cid(),
+            c=reader.count(),
+            p=reader.period(),
+            a=reader.answer(),
+            perm=permissions,
+        )
 
         msg.reply_markdown(answer)

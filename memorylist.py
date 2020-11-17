@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 from collections.abc import Sequence
 
@@ -16,13 +17,15 @@ class MemoryList(Sequence):
     def __init__(self, capacity, data=None):
         super(MemoryList, self).__init__()
         self._capacity = capacity
-        if (data is not None):
+        if data is not None:
             self._list = list(data)
         else:
             self._list = list()
 
     def __repr__(self):
-        return "<{0} {1}, capacity {2}>".format(self.__class__.__name__, self._list, self._capacity)
+        return "<{0} {1}, capacity {2}>".format(
+            self.__class__.__name__, self._list, self._capacity
+        )
 
     def __str__(self):
         return "{0}, {1}/{2}".format(self._list, len(self._list), self._capacity)

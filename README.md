@@ -44,11 +44,11 @@ Sending the command on its own (e.g. `/answer`) tells you the current value. Sen
 
 ### Restricted
 
-This toggles the chat's *restriction* (off by default). Having the chat *restricted* means that only the administrators of a chat can send configuration commands, like `/period n` or `/answer n`, only they can force the bot to speak with the `/speak` command, and only they can summon the bot. The bot will still read all users' messages and will still send periodic messages for all to enjoy.
+This toggles the chat's _restriction_ (off by default). Having the chat _restricted_ means that only the administrators of a chat can send configuration commands, like `/period n` or `/answer n`, only they can force the bot to speak with the `/speak` command, and only they can summon the bot. The bot will still read all users' messages and will still send periodic messages for all to enjoy.
 
 ### Silenced
 
-This toggles the chat's *silence* (off by default). Having the chat *silenced* means that possible user mentions that may appear in randomly generated messages, will be disabled by enveloping the '@' between parentheses. This will avoid Telegram mention notifications, specially useful for those who have the group chat muted.
+This toggles the chat's _silence_ (off by default). Having the chat _silenced_ means that possible user mentions that may appear in randomly generated messages, will be disabled by enveloping the '@' between parentheses. This will avoid Telegram mention notifications, specially useful for those who have the group chat muted.
 
 ## When does the bot send a message?
 

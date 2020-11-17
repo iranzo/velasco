@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import random
 import json
@@ -10,10 +11,10 @@ import json
 # "different" words that would only differ in having a whitespace
 # attached or not
 def rewrite(text):
-    words = text.replace('\n', '\n ').split(' ')
+    words = text.replace("\n", "\n ").split(" ")
     i = 0
     while i < len(words):
-        w = words[i].strip(' \t')
+        w = words[i].strip(" \t")
         if len(w) > 0:
             words[i] = w
         else:
@@ -31,9 +32,9 @@ def getkey(w1, w2):
 
 # This turns a dictionary key back into 2 separate words
 def getwords(key):
-    words = key.strip('()').split(', ')
+    words = key.strip("()").split(", ")
     for i in range(len(words)):
-        words[i].strip('\'')
+        words[i].strip("'")
     return words
 
 
@@ -45,7 +46,7 @@ def triplets(wordlist):
         return
 
     for i in range(len(wordlist) - 2):
-        yield (wordlist[i], wordlist[i+1], wordlist[i+2])
+        yield (wordlist[i], wordlist[i + 1], wordlist[i + 2])
 
 
 class Generator(object):
@@ -155,7 +156,7 @@ class Generator(object):
                 # Get a random third word that follows the chain of words 1
                 # and 2, then make words 2 and 3 to be the new words 1 and 2
                 w1, w2 = w2, random.choice(self.cache[getkey(w1, w2)])
-        return ' '.join(gen_words)
+        return " ".join(gen_words)
 
     # Cross a second Generator into this one
     def cross(self, gen):

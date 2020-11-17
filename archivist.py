@@ -1,15 +1,22 @@
-
+# -*- coding: utf-8 -*-
 import os
 from reader import Reader
 from generator import Generator
 
 
 class Archivist(object):
-
-    def __init__(self, logger, chatdir=None, chatext=None, admin=0,
-                 period_inc=5, save_count=15, min_period=1,
-                 max_period=100000, read_only=False
-                 ):
+    def __init__(
+        self,
+        logger,
+        chatdir=None,
+        chatext=None,
+        admin=0,
+        period_inc=5,
+        save_count=15,
+        min_period=1,
+        max_period=100000,
+        read_only=False,
+    ):
         if chatdir is None or len(chatdir) == 0:
             chatdir = "./"
         elif chatext is None:  # Can be len(chatext) == 0
@@ -29,7 +36,9 @@ class Archivist(object):
 
     # Formats and returns a chat file path
     def chat_file(self, *formatting, **key_format):
-        return (self.chatdir + "/chat_{tag}/{file}{ext}").format(*formatting, **key_format)
+        return (self.chatdir + "/chat_{tag}/{file}{ext}").format(
+            *formatting, **key_format
+        )
 
     # Stores a Reader/Generator file pair
     def store(self, tag, data, vocab):
@@ -41,17 +50,19 @@ class Archivist(object):
         try:
             if not os.path.exists(chat_folder):
                 os.makedirs(chat_folder, exist_ok=True)
-                self.logger.info("Storing a new chat. Folder {} created.".format(chat_folder))
+                self.logger.info(
+                    "Storing a new chat. Folder {} created.".format(chat_folder)
+                )
         except Exception:
             self.logger.error("Failed creating {} folder.".format(chat_folder))
             return
-        file = open(chat_card, 'w')
+        file = open(chat_card, "w")
         file.write(data)
         file.close()
 
         if vocab is not None:
             chat_record = self.chat_file(tag=tag, file="record", ext=self.chatext)
-            file = open(chat_record, 'w', encoding="utf-16")
+            file = open(chat_record, "w", encoding="utf-16")
             file.write(vocab)
             file.close()
 
@@ -59,7 +70,7 @@ class Archivist(object):
     def load_vocab(self, tag):
         filepath = self.chat_file(tag=tag, file="record", ext=self.chatext)
         try:
-            file = open(filepath, 'r', encoding="utf-16")
+            file = open(filepath, "r", encoding="utf-16")
             record = file.read()
             file.close()
             return record
@@ -72,8 +83,8 @@ class Archivist(object):
     def load_vocab_old(self, tag):
         filepath = self.chat_file(tag=tag, file="record", ext=self.chatext)
         try:
-            file = open(filepath, 'r')
-            record = file.read().encode().decode('utf-8')
+            file = open(filepath, "r")
+            record = file.read().encode().decode("utf-8")
             file.close()
             return record
         except Exception as e:
@@ -85,7 +96,7 @@ class Archivist(object):
     def load_card(self, tag):
         filepath = self.chat_file(tag=tag, file="card", ext=".txt")
         try:
-            reader_file = open(filepath, 'r')
+            reader_file = open(filepath, "r")
             reader = reader_file.read()
             reader_file.close()
             return reader
@@ -103,7 +114,9 @@ class Archivist(object):
                 vocab = Generator.loads(vocab_dump)
             else:
                 vocab = Generator()
-            return Reader.FromCard(card, vocab, self.min_period, self.max_period, self.logger)
+            return Reader.FromCard(
+                card, vocab, self.min_period, self.max_period, self.logger
+            )
         else:
             return None
 
@@ -127,7 +140,11 @@ class Archivist(object):
                 try:
                     reader = self.get_reader(cid)
                     # self.logger.info("Chat {} contents:\n{}".format(cid, reader.card.dumps()))
-                    self.logger.info("Successfully passed through {} ({}) chat.\n".format(cid, reader.title()))
+                    self.logger.info(
+                        "Successfully passed through {} ({}) chat.\n".format(
+                            cid, reader.title()
+                        )
+                    )
                     if reader.period() > self.max_period:
                         reader.set_period(self.max_period)
                         self.store(*reader.archive())

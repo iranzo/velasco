@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import random
 from metadata import Metadata, parse_card_line
@@ -67,8 +68,10 @@ class Reader(object):
 
     # Deprecated: this method will be removed in a new version
     def FromFile(text, min_period, max_period, logger, vocab=None):
-        print("Warning! This method of loading a Reader from file (Reader.FromFile(...))",
-              "is deprecated, and will be removed from the next update. Use FromCard instead.")
+        print(
+            "Warning! This method of loading a Reader from file (Reader.FromFile(...))",
+            "is deprecated, and will be removed from the next update. Use FromCard instead.",
+        )
 
         # Load a Reader from a file's text string
         lines = text.splitlines()
@@ -80,15 +83,15 @@ class Reader(object):
             # I stopped saving the chat metadata and the cache together
         elif version == "v3":
             meta = Metadata.loadl(lines[0:8])
-            cache = '\n'.join(lines[9:])
+            cache = "\n".join(lines[9:])
             vocab = Generator.loads(cache)
         elif version == "v2":
             meta = Metadata.loadl(lines[0:7])
-            cache = '\n'.join(lines[8:])
+            cache = "\n".join(lines[8:])
             vocab = Generator.loads(cache)
         elif version == "dict:":
             meta = Metadata.loadl(lines[0:6])
-            cache = '\n'.join(lines[6:])
+            cache = "\n".join(lines[6:])
             vocab = Generator.loads(cache)
         else:
             meta = Metadata.loadl(lines[0:4])
@@ -151,13 +154,13 @@ class Reader(object):
         return self.meta.restricted
 
     def toggle_restrict(self):
-        self.meta.restricted = (not self.meta.restricted)
+        self.meta.restricted = not self.meta.restricted
 
     def is_silenced(self):
         return self.meta.silenced
 
     def toggle_silence(self):
-        self.meta.silenced = (not self.meta.silenced)
+        self.meta.silenced = not self.meta.silenced
 
     # Rolls the chance for answering in this specific chat,
     # according to the answer probability
