@@ -335,8 +335,9 @@ class Speaker(object):
                 # We've been muted in the chat, get out of it as it doesn't make any sense to remain
                 self.logger.error("Leaving chat...")
                 bot.leaveChat(cid)
-            self.logger.error("Going mute for {} seconds.".format(self.mute_time))
-            self.mute_timer = int(time.perf_counter())
+            else:
+                self.logger.error("Going mute for {} seconds.".format(self.mute_time))
+                self.mute_timer = int(time.perf_counter())
         except Exception as e:
             self.logger.error("Sending a message caused exception:")
             self.logger.exception(e)
