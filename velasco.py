@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import logging
 import argparse
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+import logging
+
+from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
 
 # from telegram.error import *
 from archivist import Archivist

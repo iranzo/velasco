@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import random
-from metadata import Metadata, parse_card_line
+
 from generator import Generator
+from metadata import Metadata, parse_card_line
 
 
 # This gives me the chat title, or the first and maybe last

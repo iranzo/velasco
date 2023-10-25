@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
 # This reads a line in the format 'VARIABLE=value' and gives me the value.
 # See Metadata.loadl(...) for more details
 def parse_card_line(line):

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
-from reader import Reader
+
 from generator import Generator
+from reader import Reader
 
 
 class Archivist(object):

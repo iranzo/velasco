@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import random
 import json
+import random
 
 
 # This splits strings into lists of words delimited by space.

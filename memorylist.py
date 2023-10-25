@@ -6,13 +6,13 @@ from collections.abc import Sequence
 
 class MemoryList(Sequence):
     """Special "memory list" class that:
-       - Whenever an item is added that was already in the list,
-         it gets moved to the back instead
-       - Whenever an item is looked for, it gets moved to the
-         back
-       - If a new item is added that goes over a given capacity
-         limit, the item at the front (oldest accessed item)
-         is removed (and returned)"""
+    - Whenever an item is added that was already in the list,
+      it gets moved to the back instead
+    - Whenever an item is looked for, it gets moved to the
+      back
+    - If a new item is added that goes over a given capacity
+      limit, the item at the front (oldest accessed item)
+      is removed (and returned)"""
 
     def __init__(self, capacity, data=None):
         super(MemoryList, self).__init__()

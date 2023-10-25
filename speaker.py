@@ -4,9 +4,11 @@
 import random
 import time
 from sys import stderr
+
+from telegram.error import NetworkError
+
 from memorylist import MemoryList
 from reader import Reader, get_chat_title
-from telegram.error import NetworkError
 
 
 # Auxiliar print to stderr function (alongside logger messages)
@@ -331,7 +333,7 @@ class Speaker(object):
         except NetworkError as e:
             self.logger.error("Sending a message caused network error:")
             self.logger.exception(e)
-            if  "Not enough rights to send text messages to the chat" in str(e):
+            if "Not enough rights to send text messages to the chat" in str(e):
                 # We've been muted in the chat, get out of it as it doesn't make any sense to remain
                 self.logger.error("Leaving chat...")
                 bot.leaveChat(cid)
