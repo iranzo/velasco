@@ -25,8 +25,6 @@ async def send(bot, cid, text, replying=None, formatting=None, logger=None, **kw
                 "Attempted to send empty message to {}, skipping".format(cid)
             )
         return None
-    # Markdown or HTML formatting (both argument names are valid)
-    kwargs["parse_mode"] = formatting or kwargs.get("parse_mode")
     # ID of the message it's replying to (both argument names are valid)
     kwargs["reply_to_message_id"] = replying or kwargs.get("reply_to_message_id")
     # Reminder that dict.get(key) defaults to None if the key isn't found
@@ -38,14 +36,17 @@ async def send(bot, cid, text, replying=None, formatting=None, logger=None, **kw
             logger.info('Sending {} "{}" to {}'.format(words[0][4:-1], words[1], cid))
             # Logs something like 'Sending VIDEO "VIDEO_ID" to CHAT_ID'
 
+        # For media messages, filter out parse_mode as it's not supported
+        media_kwargs = {k: v for k, v in kwargs.items() if k != "parse_mode"}
         if words[0] == Reader.STICKER_TAG:
-            return await bot.send_sticker(cid, words[1], **kwargs)
+            return await bot.send_sticker(cid, words[1], **media_kwargs)
         elif words[0] == Reader.ANIM_TAG:
-            return await bot.send_animation(cid, words[1], **kwargs)
+            return await bot.send_animation(cid, words[1], **media_kwargs)
         elif words[0] == Reader.VIDEO_TAG:
-            return await bot.send_video(cid, words[1], **kwargs)
+            return await bot.send_video(cid, words[1], **media_kwargs)
     else:
-        # It's text
+        # It's text - set parse_mode for text messages only
+        kwargs["parse_mode"] = formatting or kwargs.get("parse_mode")
         if logger:
             mtype = "reply" if (kwargs.get("reply_to_message_id")) else "message"
             logger.info("Sending a {} to {}: '{}'".format(mtype, cid, text))
