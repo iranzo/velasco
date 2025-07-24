@@ -17,7 +17,14 @@ def eprint(*args, **kwargs):
 
 
 # Auxiliar message to send a text to a chat through a bot
-def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
+async def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
+    # Check if text is empty or just whitespace
+    if not text or not text.strip():
+        if logger:
+            logger.warning(
+                "Attempted to send empty message to {}, skipping".format(cid)
+            )
+        return None
     # Markdown or HTML formatting (both argument names are valid)
     kwargs["parse_mode"] = formatting or kwargs.get("parse_mode")
     # ID of the message it's replying to (both argument names are valid)
@@ -32,18 +39,18 @@ def send(bot, cid, text, replying=None, formatting=None, logger=None, **kwargs):
             # Logs something like 'Sending VIDEO "VIDEO_ID" to CHAT_ID'
 
         if words[0] == Reader.STICKER_TAG:
-            return bot.send_sticker(cid, words[1], **kwargs)
+            return await bot.send_sticker(cid, words[1], **kwargs)
         elif words[0] == Reader.ANIM_TAG:
-            return bot.send_animation(cid, words[1], **kwargs)
+            return await bot.send_animation(cid, words[1], **kwargs)
         elif words[0] == Reader.VIDEO_TAG:
-            return bot.send_video(cid, words[1], **kwargs)
+            return await bot.send_video(cid, words[1], **kwargs)
     else:
         # It's text
         if logger:
             mtype = "reply" if (kwargs.get("reply_to_message_id")) else "message"
             logger.info("Sending a {} to {}: '{}'".format(mtype, cid, text))
             # eprint('.')
-        return bot.send_message(cid, text, **kwargs)
+        return await bot.send_message(cid, text, **kwargs)
 
 
 class Speaker(object):
@@ -58,7 +65,7 @@ class Speaker(object):
         archivist,
         logger,
         admin=0,
-        nicknames=[],
+        nicknames=None,
         reply=0.1,
         repeat=0.05,
         wakeup=False,
@@ -71,7 +78,7 @@ class Speaker(object):
         max_len=50,
     ):
         # List of nicknames other than the username that the bot can be called as
-        self.names = nicknames
+        self.names = nicknames or []
         # Mute time for Telegram network errors
         self.mute_time = mute_time
         # Last mute timestamp
@@ -119,11 +126,11 @@ class Speaker(object):
         self.max_len = max_len
 
     # Sends an announcement to all chats that pass the check
-    def announce(self, bot, announcement, check=(lambda _: True)):
+    async def announce(self, bot, announcement, check=(lambda _: True)):
         for reader in self.readers_pass():
             try:
                 if check(reader):
-                    send(bot, reader.cid(), announcement)
+                    await send(bot, reader.cid(), announcement)
                     self.logger.info(
                         "Sending announcement to chat {}".format(reader.cid())
                     )
@@ -132,15 +139,15 @@ class Speaker(object):
 
     # If wakeup flag is set, sends a wake-up message as announcement to all chats that
     # are groups. Also, always sends a wakeup message to the 'bot admin'
-    def wake(self, bot, wake):
-        send(bot, self.admin, wake)
+    async def wake(self, bot, wake):
+        await send(bot, self.admin, wake)
 
         if self.wakeup:
 
             def group_check(reader):
                 return reader.check_type("group")
 
-            self.announce(bot, wake, group_check)
+            await self.announce(bot, wake, group_check)
 
     # Looks up a reader in the memory list
     def get_reader(self, cid):
@@ -197,13 +204,13 @@ class Speaker(object):
 
     # Series of checks to determine if the bot should reply to a specific message, aside
     # from the usual periodic messages
-    def should_reply(self, message, reader):
+    async def should_reply(self, message, reader):
         if self.is_mute():
             # Not if mute time hasn't finished
             return False
         if not self.bypass and reader.is_restricted():
             # If we're not in testing mode and the chat is restricted
-            user = message.chat.get_member(message.from_user.id)
+            user = await message.chat.get_member(message.from_user.id)
             if not self.user_is_admin(user):
                 # ...And the user has no permissions, should not reply
                 return False
@@ -239,7 +246,7 @@ class Speaker(object):
             self.logger.info("Chats saved.")
 
     # Reads a non-command message
-    def read(self, update, context):
+    async def read(self, update, context):
         # Check for save time
         self.save()
 
@@ -252,8 +259,8 @@ class Speaker(object):
         reader.read(update.message)
 
         # Check if it's a "replyable" message & roll the chance to do so
-        if self.should_reply(update.message, reader) and reader.is_answering():
-            self.say(context.bot, reader, replying=update.message.message_id)
+        if await self.should_reply(update.message, reader) and reader.is_answering():
+            await self.say(context.bot, reader, replying=update.message.message_id)
             return
 
         # Update the Reader's title if it has changed since the last message read
@@ -267,15 +274,15 @@ class Speaker(object):
             reader.reset_countdown()
             # Random chance to reply to a recent message
             rid = reader.random_memory() if random.random() <= self.reply else None
-            self.say(context.bot, reader, replying=rid)
+            await self.say(context.bot, reader, replying=rid)
 
     # Handles /speak command
-    def speak(self, update, context):
+    async def speak(self, update, context):
         chat = update.message.chat
         reader = self.load_reader(chat)
 
         if not self.bypass and reader.is_restricted():
-            user = update.message.chat.get_member(update.message.from_user.id)
+            user = await update.message.chat.get_member(update.message.from_user.id)
             if not self.user_is_admin(user):
                 # update.message.reply_text("You do not have permissions to do that.")
                 return
@@ -287,7 +294,7 @@ class Speaker(object):
         words = update.message.text.split()
         if len(words) > 1:
             reader.read(" ".join(words[1:]))
-        self.say(context.bot, reader, replying=rid)
+        await self.say(context.bot, reader, replying=rid)
 
     # Checks user permissions. Bot admin is always considered as having full permissions
     def user_is_admin(self, member):
@@ -306,10 +313,14 @@ class Speaker(object):
 
     # Generate speech (message)
     def speech(self, reader):
-        return reader.generate_message(self.max_len)
+        generated = reader.generate_message(self.max_len)
+        # If nothing was generated (not enough learned content), stay silent like a real user would
+        if not generated or not generated.strip():
+            return ""
+        return generated
 
     # Say a newly generated message
-    def say(self, bot, reader, replying=None, **kwargs):
+    async def say(self, bot, reader, replying=None, **kwargs):
         cid = reader.cid()
         if self.cid_whitelist is not None and cid not in self.cid_whitelist:
             # Don't, if there's a whitelist and this chat is not in it
@@ -319,7 +330,9 @@ class Speaker(object):
             return
 
         try:
-            send(bot, cid, self.speech(reader), replying, logger=self.logger, **kwargs)
+            await send(
+                bot, cid, self.speech(reader), replying, logger=self.logger, **kwargs
+            )
             if self.bypass:
                 # Testing mode, force a reasonable period (to not have the bot spam one specific chat with a low period)
                 minp = self.min_period
@@ -327,7 +340,7 @@ class Speaker(object):
                 rangep = maxp - minp
                 reader.set_period(random.randint(rangep // 4, rangep) + minp)
             if random.random() <= self.repeat:
-                send(bot, cid, self.speech(reader), logger=self.logger, **kwargs)
+                await send(bot, cid, self.speech(reader), logger=self.logger, **kwargs)
         # Consider any Network Error as a Telegram temporary ban, as I couldn't find
         # out in the documentation how error 429 is handled by python-telegram-bot
         except NetworkError as e:
@@ -345,46 +358,50 @@ class Speaker(object):
             self.logger.exception(e)
 
     # Handling /count command
-    def get_count(self, update, context):
+    async def get_count(self, update, context):
         cid = str(update.message.chat.id)
         reader = self.load_reader(cid)
 
         num = str(reader.count()) if reader else "no"
-        update.message.reply_text("I remember {} messages.".format(num))
+        await update.message.reply_text("I remember {} messages.".format(num))
 
     # Handling /get_chats command (exclusive for bot admin)
-    def get_chats(self, update, context):
+    async def get_chats(self, update, context):
         lines = [
             "[{}]: {}".format(reader.cid(), reader.title())
             for reader in self.readers_pass()
         ]
         chat_list = "\n".join(lines)
-        update.message.reply_text("I have the following chats:\n\n" + chat_list)
+        await update.message.reply_text("I have the following chats:\n\n" + chat_list)
 
     # Handling /period command
     # Print the current period or set a new one if one is given
-    def period(self, update, context):
+    async def period(self, update, context):
         chat = update.message.chat
         reader = self.load_reader(str(chat.id))
 
         words = update.message.text.split()
         if len(words) <= 1:
-            update.message.reply_text(
+            await update.message.reply_text(
                 "The current speech period is {}".format(reader.period())
             )
             return
 
         if reader.is_restricted():
-            user = update.message.chat.get_member(update.message.from_user.id)
+            user = await update.message.chat.get_member(update.message.from_user.id)
             if not self.user_is_admin(user):
-                update.message.reply_text("You do not have permissions to do that.")
+                await update.message.reply_text(
+                    "You do not have permissions to do that."
+                )
                 return
         try:
             period = int(words[1])
             period = reader.set_period(period)
-            update.message.reply_text("Period of speaking set to {}.".format(period))
+            await update.message.reply_text(
+                "Period of speaking set to {}.".format(period)
+            )
         except Exception:
-            update.message.reply_text(
+            await update.message.reply_text(
                 "Format was confusing; period unchanged from {}.".format(
                     reader.period()
                 )
@@ -392,28 +409,32 @@ class Speaker(object):
 
     # Handling /answer command
     # Print the current answer probability or set a new one if one is given
-    def answer(self, update, context):
+    async def answer(self, update, context):
         chat = update.message.chat
         reader = self.load_reader(str(chat.id))
 
         words = update.message.text.split()
         if len(words) <= 1:
-            update.message.reply_text(
+            await update.message.reply_text(
                 "The current answer probability is {}".format(reader.answer())
             )
             return
 
         if reader.is_restricted():
-            user = update.message.chat.get_member(update.message.from_user.id)
+            user = await update.message.chat.get_member(update.message.from_user.id)
             if not self.user_is_admin(user):
-                update.message.reply_text("You do not have permissions to do that.")
+                await update.message.reply_text(
+                    "You do not have permissions to do that."
+                )
                 return
         try:
             answer = float(words[1])
             answer = reader.set_answer(answer)
-            update.message.reply_text("Answer probability set to {}.".format(answer))
+            await update.message.reply_text(
+                "Answer probability set to {}.".format(answer)
+            )
         except Exception:
-            update.message.reply_text(
+            await update.message.reply_text(
                 "Format was confusing; answer probability unchanged from {}.".format(
                     reader.answer()
                 )
@@ -421,42 +442,46 @@ class Speaker(object):
 
     # Handling /restrict command
     # Toggle the restriction value if it's a group chat and the user has permissions to do so
-    def restrict(self, update, context):
+    async def restrict(self, update, context):
         if "group" not in update.message.chat.type:
-            update.message.reply_text("That only works in groups.")
+            await update.message.reply_text("That only works in groups.")
             return
         chat = update.message.chat
-        user = chat.get_member(update.message.from_user.id)
+        user = await chat.get_member(update.message.from_user.id)
         reader = self.load_reader(str(chat.id))
 
         if reader.is_restricted():
             if not self.user_is_admin(user):
-                update.message.reply_text("You do not have permissions to do that.")
+                await update.message.reply_text(
+                    "You do not have permissions to do that."
+                )
                 return
         reader.toggle_restrict()
         allowed = "let only admins" if reader.is_restricted() else "let everyone"
-        update.message.reply_text("I will {} configure me now.".format(allowed))
+        await update.message.reply_text("I will {} configure me now.".format(allowed))
 
     # Handling /silence command
     # Toggle the silence value if it's a group chat and the user has permissions to do so
-    def silence(self, update, context):
+    async def silence(self, update, context):
         if "group" not in update.message.chat.type:
-            update.message.reply_text("That only works in groups.")
+            await update.message.reply_text("That only works in groups.")
             return
         chat = update.message.chat
-        user = chat.get_member(update.message.from_user.id)
+        user = await chat.get_member(update.message.from_user.id)
         reader = self.load_reader(str(chat.id))
 
         if reader.is_restricted():
             if not self.user_is_admin(user):
-                update.message.reply_text("You do not have permissions to do that.")
+                await update.message.reply_text(
+                    "You do not have permissions to do that."
+                )
                 return
         reader.toggle_silence()
         allowed = "avoid mentioning" if reader.is_silenced() else "mention"
-        update.message.reply_text("I will {} people now.".format(allowed))
+        await update.message.reply_text("I will {} people now.".format(allowed))
 
     # Handling /who command
-    def who(self, update, context):
+    async def who(self, update, context):
         msg = update.message
         usr = msg.from_user
         cht = msg.chat
@@ -477,10 +502,10 @@ class Speaker(object):
             tstamp=str(msg.date),
         )
 
-        msg.reply_markdown(answer)
+        await msg.reply_markdown(answer)
 
     # Handling /where command
-    def where(self, update, context):
+    async def where(self, update, context):
         msg = update.message
         chat = msg.chat
         reader = self.access_reader(str(chat.id))
@@ -506,4 +531,4 @@ class Speaker(object):
             perm=permissions,
         )
 
-        msg.reply_markdown(answer)
+        await msg.reply_markdown(answer)

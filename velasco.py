@@ -4,7 +4,7 @@
 import argparse
 import logging
 
-from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 # from telegram.error import *
 from archivist import Archivist
@@ -61,8 +61,8 @@ explanation = "I decompose every message I read in groups of 3 consecutive words
 
 
 def static_reply(text, format=None):
-    def reply(update, context):
-        update.message.reply_text(text, parse_mode=format)
+    async def reply(update, context):
+        await update.message.reply_text(text, parse_mode=format)
 
     return reply
 
@@ -169,8 +169,8 @@ def main():
 
     assert args.max_period >= args.min_period
 
-    # Create the EventHandler and pass it your bot's token.
-    updater = Updater(args.token, use_context=True)
+    # Create the Application and pass it your bot's token.
+    application = Application.builder().token(args.token).build()
 
     filter_cids = args.filter
     if filter_cids:
@@ -185,7 +185,9 @@ def main():
         read_only=False,
     )
 
-    username = updater.bot.get_me().username
+    # We'll get the username after the application starts
+    # For now, use a placeholder that will be updated
+    username = "velascobot"
     speakerbot = Speaker(
         "@" + username,
         archivist,
@@ -199,51 +201,48 @@ def main():
         save_time=args.save_time,
     )
 
-    # Get the dispatcher to register handlers
-    dp = updater.dispatcher
+    # Define a post-init callback to send wake message after bot starts
+    async def post_init(app):
+        await speakerbot.wake(app.bot, wake_msg)
 
-    # on different commands - answer in Telegram
-    dp.add_handler(CommandHandler("start", static_reply(start_msg)))
-    dp.add_handler(CommandHandler("about", static_reply(about_msg)))
-    dp.add_handler(CommandHandler("explain", static_reply(explanation)))
-    dp.add_handler(CommandHandler("help", static_reply(help_msg)))
-    dp.add_handler(CommandHandler("count", speakerbot.get_count))
-    dp.add_handler(CommandHandler("period", speakerbot.period))
-    dp.add_handler(
+    # Set the post_init callback on the application
+    application.post_init = post_init
+
+    # Add handlers to the application
+    application.add_handler(CommandHandler("start", static_reply(start_msg)))
+    application.add_handler(CommandHandler("about", static_reply(about_msg)))
+    application.add_handler(CommandHandler("explain", static_reply(explanation)))
+    application.add_handler(CommandHandler("help", static_reply(help_msg)))
+    application.add_handler(CommandHandler("count", speakerbot.get_count))
+    application.add_handler(CommandHandler("period", speakerbot.period))
+    application.add_handler(
         CommandHandler(
-            "list", speakerbot.get_chats, filters=Filters.chat(chat_id=speakerbot.admin)
+            "list", speakerbot.get_chats, filters=filters.Chat(chat_id=speakerbot.admin)
         )
     )
-    # dp.add_handler(CommandHandler("user", get_name, Filters.chat(chat_id=archivist.admin)))
-    # dp.add_handler(CommandHandler("id", get_id))
-    dp.add_handler(CommandHandler("stop", stop))
-    dp.add_handler(CommandHandler("speak", speakerbot.speak))
-    dp.add_handler(CommandHandler("answer", speakerbot.answer))
-    dp.add_handler(CommandHandler("restrict", speakerbot.restrict))
-    dp.add_handler(CommandHandler("silence", speakerbot.silence))
-    dp.add_handler(CommandHandler("who", speakerbot.who))
-    dp.add_handler(CommandHandler("where", speakerbot.where))
+    # application.add_handler(CommandHandler("user", get_name, filters.Chat(chat_id=archivist.admin)))
+    # application.add_handler(CommandHandler("id", get_id))
+    application.add_handler(CommandHandler("stop", stop))
+    application.add_handler(CommandHandler("speak", speakerbot.speak))
+    application.add_handler(CommandHandler("answer", speakerbot.answer))
+    application.add_handler(CommandHandler("restrict", speakerbot.restrict))
+    application.add_handler(CommandHandler("silence", speakerbot.silence))
+    application.add_handler(CommandHandler("who", speakerbot.who))
+    application.add_handler(CommandHandler("where", speakerbot.where))
 
     # on noncommand i.e message - echo the message on Telegram
-    # dp.add_handler(MessageHandler(Filters.text, echo))
-    dp.add_handler(
+    # application.add_handler(MessageHandler(filters.TEXT, echo))
+    application.add_handler(
         MessageHandler(
-            (Filters.text | Filters.sticker | Filters.animation), speakerbot.read
+            (filters.TEXT | filters.Sticker.ALL | filters.ANIMATION), speakerbot.read
         )
     )
 
     # log all errors
-    dp.add_error_handler(error)
+    application.add_error_handler(error)
 
-    speakerbot.wake(updater.bot, wake_msg)
-
-    # Start the Bot
-    updater.start_polling()
-
-    # Run the bot until you press Ctrl-C or the process receives SIGINT,
-    # SIGTERM or SIGABRT. This should be used most of the time, since
-    # start_polling() is non-blocking and will stop the bot gracefully.
-    updater.idle()
+    # Run the bot until the user presses Ctrl-C
+    application.run_polling()
 
 
 if __name__ == "__main__":
