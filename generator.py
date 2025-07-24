@@ -148,7 +148,7 @@ class Generator(object):
             else:
                 # ..append word 1
                 gen_words.append(w1)
-            if w2 == Generator.TAIL or not getkey(w1, w2) in self.cache:
+            if w2 == Generator.TAIL or getkey(w1, w2) not in self.cache:
                 # When there's no key from the last 2 words to follow the chain,
                 # or we reached a separation between messages, stop
                 break
